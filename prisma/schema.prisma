@@ -1,0 +1,99 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum RoleEnum {
+  ADMIN
+  MANAGER
+  AGENT
+  CUSTOMER
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  REGISTER
+  CREATE
+  UPDATE
+  DELETE
+  READ
+  PERMISSION_CHANGE
+  ROLE_CHANGE
+  ACCESS_DENIED
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String
+  resource    String
+  action      String
+  level       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users User[]
+
+  @@map("permissions")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        RoleEnum @unique
+  description String
+  permissions String[]
+  level       Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("roles")
+}
+
+model User {
+  id                 String       @id @default(uuid())
+  email              String       @unique
+  password           String
+  firstName          String
+  lastName           String
+  role               RoleEnum     @default(CUSTOMER)
+  isActive           Boolean      @default(true)
+  lastLoginAt        DateTime?
+  grantedPermissions String[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  permissions Permission[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  userId     String
+  userEmail  String
+  action     AuditAction
+  resource   String?
+  resourceId String?
+  oldData    Json?
+  newData    Json?
+  ipAddress  String?
+  userAgent  String?
+  status     String?
+  timestamp  DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
