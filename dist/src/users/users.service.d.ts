@@ -11,33 +11,36 @@ export declare class UsersService {
     findOne(id: string): Promise<UserProfile>;
     findByEmail(email: string): Promise<{
         permissions: {
-            level: number;
             id: string;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
             name: string;
             description: string;
             resource: string;
             action: string;
+            level: number;
+            isActive: boolean;
+            createdAt: Date;
+            updatedAt: Date;
         }[];
     } & {
         id: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        role: import(".prisma/client").$Enums.RoleEnum;
         email: string;
         password: string;
         firstName: string;
         lastName: string;
-        role: import(".prisma/client").$Enums.RoleEnum;
-        isActive: boolean;
         lastLoginAt: Date | null;
         grantedPermissions: string[];
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     update(id: string, updateData: UpdateUserData, updatedBy: UserProfile): Promise<UserProfile>;
     remove(id: string, deletedBy: UserProfile): Promise<{
         message: string;
     }>;
+    suspend(id: string, suspendedBy: UserProfile): Promise<UserProfile>;
+    ban(id: string, bannedBy: UserProfile): Promise<UserProfile>;
+    activate(id: string, activatedBy: UserProfile): Promise<UserProfile>;
     assignRole(userId: string, newRole: RoleEnum, assignedBy: UserProfile): Promise<UserProfile>;
     grantPermission(userId: string, permission: string, grantedBy: UserProfile): Promise<UserProfile>;
     revokePermission(userId: string, permission: string, revokedBy: UserProfile): Promise<UserProfile>;

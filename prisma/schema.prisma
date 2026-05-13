@@ -26,6 +26,9 @@ enum AuditAction {
   PERMISSION_CHANGE
   ROLE_CHANGE
   ACCESS_DENIED
+  SUSPEND
+  BAN
+  ACTIVATE
 }
 
 model Permission {

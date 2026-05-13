@@ -19,6 +19,7 @@ export interface TokenPayload {
   sub: string;
   email: string;
   role: RoleEnum;
+  grantedPermissions?: string[];
 }
 export interface AuthTokens {
   accessToken: string;

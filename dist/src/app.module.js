@@ -18,6 +18,7 @@ const roles_module_1 = require("./roles/roles.module");
 const permissions_module_1 = require("./permissions/permissions.module");
 const audit_log_module_1 = require("./audit-log/audit-log.module");
 const prisma_module_1 = require("./prisma/prisma.module");
+const customer_portal_module_1 = require("./customer-portal/customer-portal.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -30,9 +31,7 @@ exports.AppModule = AppModule = __decorate([
                 inject: [config_1.ConfigService],
                 useFactory: (configService) => ({
                     secret: configService.get('JWT_SECRET'),
-                    signOptions: {
-                        expiresIn: configService.get('JWT_EXPIRES_IN') || '15m',
-                    },
+                    signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') || '15m' },
                 }),
             }),
             prisma_module_1.PrismaModule,
@@ -41,6 +40,7 @@ exports.AppModule = AppModule = __decorate([
             roles_module_1.RolesModule,
             permissions_module_1.PermissionsModule,
             audit_log_module_1.AuditLogModule,
+            customer_portal_module_1.CustomerPortalModule,
         ],
         providers: [{ provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard }],
     })

@@ -9,45 +9,45 @@ export declare class PermissionsService {
         message: string;
     }>;
     findAll(): Promise<{
-        level: number;
         id: string;
         name: string;
         description: string;
         resource: string;
         action: string;
+        level: number;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
     }[]>;
     findOne(id: string): Promise<{
-        level: number;
         id: string;
         name: string;
         description: string;
         resource: string;
         action: string;
+        level: number;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
     }>;
     create(data: CreatePermissionData, createdBy: UserProfile): Promise<{
-        level: number;
         id: string;
         name: string;
         description: string;
         resource: string;
         action: string;
+        level: number;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
     }>;
     update(id: string, updateData: UpdatePermissionData, updatedBy: UserProfile): Promise<{
-        level: number;
         id: string;
         name: string;
         description: string;
         resource: string;
         action: string;
+        level: number;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;

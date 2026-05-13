@@ -24,20 +24,49 @@ let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
     }
-    async register(dto, req) {
-        return this.authService.register(dto, req.ip, req.headers['user-agent']);
+    async register(dto, req, res) {
+        const result = await this.authService.register(dto, req.ip, req.headers['user-agent']);
+        this.setRefreshTokenCookie(res, result.refreshToken);
+        return { accessToken: result.accessToken, user: result.user };
     }
-    async login(dto, req) {
-        return this.authService.login(dto, req.ip, req.headers['user-agent']);
+    async login(dto, req, res) {
+        console.log('Login attempt:', dto);
+        const result = await this.authService.login(dto, req.ip, req.headers['user-agent']);
+        this.setRefreshTokenCookie(res, result.refreshToken);
+        console.log('Login successful for user:', {
+            accessToken: result.accessToken,
+            user: result.user,
+        });
+        return { accessToken: result.accessToken, user: result.user };
     }
-    async refresh(dto) {
-        return this.authService.refreshToken(dto.refreshToken);
+    async refresh(req, res) {
+        const refreshToken = req.cookies?.refreshToken;
+        if (!refreshToken)
+            throw new Error('No refresh token');
+        const result = await this.authService.refreshToken(refreshToken);
+        this.setRefreshTokenCookie(res, result.refreshToken);
+        return { accessToken: result.accessToken, user: result.user };
     }
-    async logout(user, req) {
-        return this.authService.logout(user, req.ip, req.headers['user-agent']);
+    async logout(user, req, res) {
+        const refreshToken = req.cookies?.refreshToken || '';
+        await this.authService.logout(user, refreshToken, req.ip, req.headers['user-agent']);
+        this.clearRefreshTokenCookie(res);
+        return { message: 'Logged out successfully' };
     }
     me(user) {
         return user;
+    }
+    setRefreshTokenCookie(res, refreshToken) {
+        res.cookie('refreshToken', refreshToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+            path: '/',
+        });
+    }
+    clearRefreshTokenCookie(res) {
+        res.clearCookie('refreshToken', { path: '/' });
     }
 };
 exports.AuthController = AuthController;
@@ -46,8 +75,9 @@ __decorate([
     (0, common_1.Post)('register'),
     __param(0, (0, common_1.Body)(new zod_validation_pipe_1.ZodValidationPipe(auth_dto_1.RegisterSchema))),
     __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
@@ -56,17 +86,19 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, common_1.Body)(new zod_validation_pipe_1.ZodValidationPipe(auth_dto_1.LoginSchema))),
     __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
     (0, public_decorator_1.Public)(),
     (0, common_1.Post)('refresh'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
-    __param(0, (0, common_1.Body)(new zod_validation_pipe_1.ZodValidationPipe(auth_dto_1.RefreshTokenSchema))),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "refresh", null);
 __decorate([
@@ -75,8 +107,9 @@ __decorate([
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     __param(0, (0, current_user_decorator_1.CurrentUser)()),
     __param(1, (0, common_1.Req)()),
+    __param(2, (0, common_1.Res)({ passthrough: true })),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:paramtypes", [Object, Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "logout", null);
 __decorate([

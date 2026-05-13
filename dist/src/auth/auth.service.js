@@ -56,6 +56,11 @@ let AuthService = class AuthService {
         this.jwtService = jwtService;
         this.configService = configService;
         this.auditLogService = auditLogService;
+        this.tokenBlacklist = new Set();
+        this.failedAttempts = new Map();
+        this.BLOCK_DURATION_MS = 15 * 60 * 1000;
+        this.MAX_ATTEMPTS = 5;
+        this.ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
     }
     async register(data, ipAddress, userAgent) {
         const existingUser = await this.prisma.user.findUnique({
@@ -70,7 +75,18 @@ let AuthService = class AuthService {
                 password: hashedPassword,
                 firstName: data.firstName,
                 lastName: data.lastName,
+                role: data.role || 'CUSTOMER',
+                permissions: {
+                    connect: data.role === 'ADMIN'
+                        ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'delete_user' }, { name: 'suspend_user' }, { name: 'ban_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }]
+                        : data.role === 'MANAGER'
+                            ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }]
+                            : data.role === 'AGENT'
+                                ? [{ name: 'view_dashboard' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'view_customer_portal' }]
+                                : [{ name: 'view_dashboard' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }],
+                },
             },
+            include: { permissions: true },
         });
         await this.auditLogService.log({
             userId: user.id,
@@ -84,6 +100,9 @@ let AuthService = class AuthService {
         return this.generateTokens(user);
     }
     async login(data, ipAddress, userAgent) {
+        if (this.isIpBlocked(ipAddress || 'unknown')) {
+            throw new common_1.ForbiddenException('Too many failed attempts. Try again in 15 minutes.');
+        }
         const user = await this.prisma.user.findUnique({
             where: { email: data.email },
             include: { permissions: true },
@@ -91,10 +110,13 @@ let AuthService = class AuthService {
         if (!user)
             throw new common_1.UnauthorizedException('Invalid credentials');
         const isPasswordValid = await bcrypt.compare(data.password, user.password);
-        if (!isPasswordValid)
+        if (!isPasswordValid) {
+            this.recordFailedAttempt(ipAddress || 'unknown');
             throw new common_1.UnauthorizedException('Invalid credentials');
+        }
         if (!user.isActive)
             throw new common_1.UnauthorizedException('Account is inactive');
+        this.clearFailedAttempts(ipAddress || 'unknown');
         await this.prisma.user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() },
@@ -110,6 +132,9 @@ let AuthService = class AuthService {
         return this.generateTokens(user);
     }
     async refreshToken(refreshToken) {
+        if (this.tokenBlacklist.has(refreshToken)) {
+            throw new common_1.UnauthorizedException('Token has been revoked');
+        }
         try {
             const payload = this.jwtService.verify(refreshToken, {
                 secret: this.configService.get('JWT_REFRESH_SECRET'),
@@ -126,7 +151,8 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Invalid refresh token');
         }
     }
-    async logout(user, ipAddress, userAgent) {
+    async logout(user, refreshToken, ipAddress, userAgent) {
+        this.tokenBlacklist.add(refreshToken);
         await this.auditLogService.log({
             userId: user.id,
             userEmail: user.email,
@@ -137,11 +163,40 @@ let AuthService = class AuthService {
         });
         return { message: 'Logged out successfully' };
     }
+    isIpBlocked(ip) {
+        const attempt = this.failedAttempts.get(ip);
+        if (!attempt)
+            return false;
+        if (Date.now() - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
+            this.failedAttempts.delete(ip);
+            return false;
+        }
+        return true;
+    }
+    recordFailedAttempt(ip) {
+        const now = Date.now();
+        const attempt = this.failedAttempts.get(ip);
+        if (!attempt || now - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
+            this.failedAttempts.set(ip, { count: 1, lastAttempt: now });
+        }
+        else {
+            attempt.count += 1;
+            attempt.lastAttempt = now;
+            this.failedAttempts.set(ip, attempt);
+        }
+    }
+    clearFailedAttempts(ip) {
+        this.failedAttempts.delete(ip);
+    }
     generateTokens(user) {
+        const grantedPerms = user.grantedPermissions || [];
+        const dbPerms = user.permissions?.map((p) => p.name) || [];
+        const allPermissions = [...grantedPerms, ...dbPerms, user.role];
         const payload = {
             sub: user.id,
             email: user.email,
             role: user.role,
+            grantedPermissions: allPermissions,
         };
         const accessToken = this.jwtService.sign(payload);
         const refreshToken = this.jwtService.sign(payload, {
@@ -151,6 +206,8 @@ let AuthService = class AuthService {
         return { accessToken, refreshToken, user: this.mapUserProfile(user) };
     }
     mapUserProfile(user) {
+        const dbPerms = user.permissions?.map((p) => p.name) || [];
+        const grantedPerms = user.grantedPermissions || [];
         return {
             id: user.id,
             email: user.email,
@@ -161,6 +218,7 @@ let AuthService = class AuthService {
             lastLoginAt: user.lastLoginAt,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
+            grantedPermissions: [...grantedPerms, ...dbPerms],
         };
     }
 };

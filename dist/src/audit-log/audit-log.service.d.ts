@@ -6,9 +6,9 @@ export declare class AuditLogService {
     constructor(prisma: PrismaService);
     log(input: AuditLogInput): Promise<{
         id: string;
-        userEmail: string;
-        action: import(".prisma/client").$Enums.AuditAction;
         resource: string | null;
+        action: import(".prisma/client").$Enums.AuditAction;
+        userEmail: string;
         resourceId: string | null;
         oldData: import("@prisma/client/runtime/client").JsonValue | null;
         newData: import("@prisma/client/runtime/client").JsonValue | null;
@@ -22,9 +22,9 @@ export declare class AuditLogService {
     findByUserId(userId: string, page?: number, limit?: number): Promise<AuditLogResult>;
     findByResource(resource: string, resourceId: string): Promise<{
         id: string;
-        userEmail: string;
-        action: import(".prisma/client").$Enums.AuditAction;
         resource: string | null;
+        action: import(".prisma/client").$Enums.AuditAction;
+        userEmail: string;
         resourceId: string | null;
         oldData: import("@prisma/client/runtime/client").JsonValue | null;
         newData: import("@prisma/client/runtime/client").JsonValue | null;

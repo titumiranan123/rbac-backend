@@ -7,12 +7,15 @@ import { AuditLogInput, AuditLogResult } from '../types';
 export class AuditLogService {
   constructor(private prisma: PrismaService) {}
 
-  // Creates new audit log entry
   async log(input: AuditLogInput) {
-    return this.prisma.auditLog.create({ data: input });
+    try {
+      return await this.prisma.auditLog.create({ data: input });
+    } catch (error) {
+      console.error('Audit log failed:', error);
+      return null;
+    }
   }
 
-  // Returns paginated audit logs with filters
   async findAll(
     page = 1,
     limit = 20,
@@ -53,16 +56,10 @@ export class AuditLogService {
     };
   }
 
-  // Returns audit logs for specific user
-  async findByUserId(
-    userId: string,
-    page = 1,
-    limit = 20,
-  ): Promise<AuditLogResult> {
+  async findByUserId(userId: string, page = 1, limit = 20): Promise<AuditLogResult> {
     return this.findAll(page, limit, userId);
   }
 
-  // Returns audit logs for specific resource
   async findByResource(resource: string, resourceId: string) {
     return this.prisma.auditLog.findMany({
       where: { resource, resourceId },

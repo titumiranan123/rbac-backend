@@ -41,6 +41,15 @@ let UsersController = class UsersController {
     async remove(id, user) {
         return this.usersService.remove(id, user);
     }
+    async suspend(id, user) {
+        return this.usersService.suspend(id, user);
+    }
+    async ban(id, user) {
+        return this.usersService.ban(id, user);
+    }
+    async activate(id, user) {
+        return this.usersService.activate(id, user);
+    }
     async assignRole(id, dto, user) {
         return this.usersService.assignRole(id, dto.role, user);
     }
@@ -96,6 +105,33 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "remove", null);
+__decorate([
+    (0, common_1.Patch)(':id/suspend'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "suspend", null);
+__decorate([
+    (0, common_1.Patch)(':id/ban'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "ban", null);
+__decorate([
+    (0, common_1.Patch)(':id/activate'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "activate", null);
 __decorate([
     (0, common_1.Post)(':id/role'),
     (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN),

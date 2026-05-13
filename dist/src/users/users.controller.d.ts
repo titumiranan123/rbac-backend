@@ -16,6 +16,9 @@ export declare class UsersController {
     remove(id: string, user: UserProfile): Promise<{
         message: string;
     }>;
+    suspend(id: string, user: UserProfile): Promise<UserProfile>;
+    ban(id: string, user: UserProfile): Promise<UserProfile>;
+    activate(id: string, user: UserProfile): Promise<UserProfile>;
     assignRole(id: string, dto: {
         role: RoleEnum;
     }, user: UserProfile): Promise<UserProfile>;

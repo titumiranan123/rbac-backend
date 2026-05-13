@@ -4,6 +4,12 @@ export declare const RegisterSchema: z.ZodObject<{
     password: z.ZodString;
     firstName: z.ZodString;
     lastName: z.ZodString;
+    role: z.ZodOptional<z.ZodEnum<{
+        ADMIN: "ADMIN";
+        MANAGER: "MANAGER";
+        AGENT: "AGENT";
+        CUSTOMER: "CUSTOMER";
+    }>>;
 }, z.core.$strip>;
 export declare const LoginSchema: z.ZodObject<{
     email: z.ZodString;

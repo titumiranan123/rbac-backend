@@ -24,6 +24,7 @@ let RolesGuard = class RolesGuard {
     }
     canActivate(context) {
         const requiredRoles = this.reflector.getAllAndOverride('roles', [context.getHandler(), context.getClass()]);
+        const exactMatch = this.reflector.getAllAndOverride('rolesExact', [context.getHandler(), context.getClass()]);
         if (!requiredRoles)
             return true;
         const request = context.switchToHttp().getRequest();
@@ -31,6 +32,9 @@ let RolesGuard = class RolesGuard {
         if (!user)
             return false;
         const userLevel = RoleHierarchy[user.role];
+        if (exactMatch) {
+            return requiredRoles.some((role) => user.role === role);
+        }
         return requiredRoles.some((role) => userLevel <= RoleHierarchy[role]);
     }
 };

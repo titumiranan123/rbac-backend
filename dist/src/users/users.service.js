@@ -171,6 +171,69 @@ let UsersService = class UsersService {
         await this.prisma.user.delete({ where: { id } });
         return { message: 'User deleted successfully' };
     }
+    async suspend(id, suspendedBy) {
+        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        if (!targetUser)
+            throw new common_1.NotFoundException('User not found');
+        if (targetUser.id === suspendedBy.id)
+            throw new common_1.ForbiddenException('Cannot suspend yourself');
+        const targetLevel = RoleHierarchy[targetUser.role];
+        const suspenderLevel = RoleHierarchy[suspendedBy.role];
+        if (suspenderLevel > targetLevel)
+            throw new common_1.ForbiddenException('You do not have permission to suspend this user');
+        const updatedUser = await this.prisma.user.update({
+            where: { id },
+            data: { isActive: false },
+        });
+        await this.auditLogService.log({
+            userId: suspendedBy.id,
+            userEmail: suspendedBy.email,
+            action: client_1.AuditAction.SUSPEND,
+            resource: 'user',
+            resourceId: id,
+        });
+        return this.sanitizeUser(updatedUser);
+    }
+    async ban(id, bannedBy) {
+        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        if (!targetUser)
+            throw new common_1.NotFoundException('User not found');
+        if (targetUser.id === bannedBy.id)
+            throw new common_1.ForbiddenException('Cannot ban yourself');
+        const targetLevel = RoleHierarchy[targetUser.role];
+        const bannerLevel = RoleHierarchy[bannedBy.role];
+        if (bannerLevel > targetLevel)
+            throw new common_1.ForbiddenException('You do not have permission to ban this user');
+        const updatedUser = await this.prisma.user.update({
+            where: { id },
+            data: { isActive: false },
+        });
+        await this.auditLogService.log({
+            userId: bannedBy.id,
+            userEmail: bannedBy.email,
+            action: client_1.AuditAction.BAN,
+            resource: 'user',
+            resourceId: id,
+        });
+        return this.sanitizeUser(updatedUser);
+    }
+    async activate(id, activatedBy) {
+        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        if (!targetUser)
+            throw new common_1.NotFoundException('User not found');
+        const updatedUser = await this.prisma.user.update({
+            where: { id },
+            data: { isActive: true },
+        });
+        await this.auditLogService.log({
+            userId: activatedBy.id,
+            userEmail: activatedBy.email,
+            action: client_1.AuditAction.ACTIVATE,
+            resource: 'user',
+            resourceId: id,
+        });
+        return this.sanitizeUser(updatedUser);
+    }
     async assignRole(userId, newRole, assignedBy) {
         const targetUser = await this.prisma.user.findUnique({
             where: { id: userId },
@@ -208,6 +271,21 @@ let UsersService = class UsersService {
         });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
+        const grantedByUser = await this.prisma.user.findUnique({
+            where: { id: grantedBy.id },
+            include: { permissions: true },
+        });
+        const grantedByPermissions = grantedByUser?.grantedPermissions || [];
+        const dbPermissions = grantedByUser?.permissions?.map((p) => p.name) || [];
+        const allGrantedByPermissions = [
+            ...grantedByPermissions,
+            ...dbPermissions,
+            grantedBy.role,
+        ];
+        if (!allGrantedByPermissions.includes(permission) &&
+            !allGrantedByPermissions.includes('*')) {
+            throw new common_1.ForbiddenException('You do not have permission to grant this permission');
+        }
         const grantedPermissions = targetUser.grantedPermissions || [];
         if (!grantedPermissions.includes(permission)) {
             grantedPermissions.push(permission);
@@ -232,6 +310,21 @@ let UsersService = class UsersService {
         });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
+        const revokedByUser = await this.prisma.user.findUnique({
+            where: { id: revokedBy.id },
+            include: { permissions: true },
+        });
+        const revokedByPermissions = revokedByUser?.grantedPermissions || [];
+        const dbPermissions = revokedByUser?.permissions?.map((p) => p.name) || [];
+        const allRevokedByPermissions = [
+            ...revokedByPermissions,
+            ...dbPermissions,
+            revokedBy.role,
+        ];
+        if (!allRevokedByPermissions.includes(permission) &&
+            !allRevokedByPermissions.includes('*')) {
+            throw new common_1.ForbiddenException('You do not have permission to revoke this permission');
+        }
         const grantedPermissions = targetUser.grantedPermissions || [];
         if (grantedPermissions.includes(permission)) {
             const updated = grantedPermissions.filter((p) => p !== permission);

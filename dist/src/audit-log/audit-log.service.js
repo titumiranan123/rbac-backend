@@ -17,7 +17,13 @@ let AuditLogService = class AuditLogService {
         this.prisma = prisma;
     }
     async log(input) {
-        return this.prisma.auditLog.create({ data: input });
+        try {
+            return await this.prisma.auditLog.create({ data: input });
+        }
+        catch (error) {
+            console.error('Audit log failed:', error);
+            return null;
+        }
     }
     async findAll(page = 1, limit = 20, userId, action, startDate, endDate) {
         const where = {};

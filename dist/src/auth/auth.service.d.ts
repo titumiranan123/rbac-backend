@@ -9,13 +9,21 @@ export declare class AuthService {
     private jwtService;
     private configService;
     private auditLogService;
+    private tokenBlacklist;
+    private failedAttempts;
+    private readonly BLOCK_DURATION_MS;
+    private readonly MAX_ATTEMPTS;
+    private readonly ATTEMPT_WINDOW_MS;
     constructor(prisma: PrismaService, jwtService: JwtService, configService: ConfigService, auditLogService: AuditLogService);
     register(data: RegisterInput, ipAddress?: string, userAgent?: string): Promise<AuthTokens>;
     login(data: LoginInput, ipAddress?: string, userAgent?: string): Promise<AuthTokens>;
     refreshToken(refreshToken: string): Promise<AuthTokens>;
-    logout(user: UserProfile, ipAddress?: string, userAgent?: string): Promise<{
+    logout(user: UserProfile, refreshToken: string, ipAddress?: string, userAgent?: string): Promise<{
         message: string;
     }>;
+    private isIpBlocked;
+    private recordFailedAttempt;
+    private clearFailedAttempts;
     private generateTokens;
     private mapUserProfile;
 }

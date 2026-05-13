@@ -12,334 +12,53 @@ const connectionString =
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
+
 const PERMISSIONS = [
-  // User permissions
-  {
-    name: 'users.read',
-    description: 'View users',
-    resource: 'users',
-    action: 'read',
-    level: 0,
-  },
-  {
-    name: 'users.create',
-    description: 'Create users',
-    resource: 'users',
-    action: 'create',
-    level: 1,
-  },
-  {
-    name: 'users.update',
-    description: 'Update users',
-    resource: 'users',
-    action: 'update',
-    level: 1,
-  },
-  {
-    name: 'users.delete',
-    description: 'Delete users',
-    resource: 'users',
-    action: 'delete',
-    level: 0,
-  },
-  {
-    name: 'users.grant',
-    description: 'Grant permissions to users',
-    resource: 'users',
-    action: 'grant',
-    level: 0,
-  },
-
-  // Role permissions
-  {
-    name: 'roles.read',
-    description: 'View roles',
-    resource: 'roles',
-    action: 'read',
-    level: 0,
-  },
-  {
-    name: 'roles.create',
-    description: 'Create roles',
-    resource: 'roles',
-    action: 'create',
-    level: 0,
-  },
-  {
-    name: 'roles.update',
-    description: 'Update roles',
-    resource: 'roles',
-    action: 'update',
-    level: 0,
-  },
-  {
-    name: 'roles.delete',
-    description: 'Delete roles',
-    resource: 'roles',
-    action: 'delete',
-    level: 0,
-  },
-
-  // Permission permissions
-  {
-    name: 'permissions.read',
-    description: 'View permissions',
-    resource: 'permissions',
-    action: 'read',
-    level: 0,
-  },
-  {
-    name: 'permissions.update',
-    description: 'Update permissions',
-    resource: 'permissions',
-    action: 'update',
-    level: 0,
-  },
-
-  // Audit permissions
-  {
-    name: 'audit.read',
-    description: 'View audit logs',
-    resource: 'audit',
-    action: 'read',
-    level: 0,
-  },
-  {
-    name: 'audit.export',
-    description: 'Export audit logs',
-    resource: 'audit',
-    action: 'export',
-    level: 0,
-  },
-
-  // Lead permissions
-  {
-    name: 'leads.read',
-    description: 'View leads',
-    resource: 'leads',
-    action: 'read',
-    level: 2,
-  },
-  {
-    name: 'leads.create',
-    description: 'Create leads',
-    resource: 'leads',
-    action: 'create',
-    level: 2,
-  },
-  {
-    name: 'leads.update',
-    description: 'Update leads',
-    resource: 'leads',
-    action: 'update',
-    level: 2,
-  },
-  {
-    name: 'leads.delete',
-    description: 'Delete leads',
-    resource: 'leads',
-    action: 'delete',
-    level: 1,
-  },
-  {
-    name: 'leads.assign',
-    description: 'Assign leads',
-    resource: 'leads',
-    action: 'assign',
-    level: 1,
-  },
-
-  // Task permissions
-  {
-    name: 'tasks.read',
-    description: 'View tasks',
-    resource: 'tasks',
-    action: 'read',
-    level: 2,
-  },
-  {
-    name: 'tasks.create',
-    description: 'Create tasks',
-    resource: 'tasks',
-    action: 'create',
-    level: 2,
-  },
-  {
-    name: 'tasks.update',
-    description: 'Update tasks',
-    resource: 'tasks',
-    action: 'update',
-    level: 2,
-  },
-  {
-    name: 'tasks.delete',
-    description: 'Delete tasks',
-    resource: 'tasks',
-    action: 'delete',
-    level: 1,
-  },
-  {
-    name: 'tasks.assign',
-    description: 'Assign tasks',
-    resource: 'tasks',
-    action: 'assign',
-    level: 1,
-  },
-
-  // Report permissions
-  {
-    name: 'reports.read',
-    description: 'View reports',
-    resource: 'reports',
-    action: 'read',
-    level: 1,
-  },
-  {
-    name: 'reports.create',
-    description: 'Create reports',
-    resource: 'reports',
-    action: 'create',
-    level: 1,
-  },
-  {
-    name: 'reports.export',
-    description: 'Export reports',
-    resource: 'reports',
-    action: 'export',
-    level: 1,
-  },
-
-  // Settings permissions
-  {
-    name: 'settings.read',
-    description: 'View settings',
-    resource: 'settings',
-    action: 'read',
-    level: 0,
-  },
-  {
-    name: 'settings.update',
-    description: 'Update settings',
-    resource: 'settings',
-    action: 'update',
-    level: 0,
-  },
-
-  // Profile permissions
-  {
-    name: 'profile.read',
-    description: 'View own profile',
-    resource: 'profile',
-    action: 'read',
-    level: 3,
-  },
-  {
-    name: 'profile.update',
-    description: 'Update own profile',
-    resource: 'profile',
-    action: 'update',
-    level: 3,
-  },
+  { name: 'view_dashboard', description: 'View Dashboard', resource: 'dashboard', action: 'view', level: 0 },
+  { name: 'view_users', description: 'View Users', resource: 'users', action: 'view', level: 0 },
+  { name: 'create_user', description: 'Create Users', resource: 'users', action: 'create', level: 0 },
+  { name: 'edit_user', description: 'Edit Users', resource: 'users', action: 'edit', level: 0 },
+  { name: 'delete_user', description: 'Delete Users', resource: 'users', action: 'delete', level: 0 },
+  { name: 'suspend_user', description: 'Suspend Users', resource: 'users', action: 'suspend', level: 0 },
+  { name: 'ban_user', description: 'Ban Users', resource: 'users', action: 'ban', level: 0 },
+  { name: 'view_leads', description: 'View Leads', resource: 'leads', action: 'view', level: 2 },
+  { name: 'create_lead', description: 'Create Leads', resource: 'leads', action: 'create', level: 2 },
+  { name: 'edit_lead', description: 'Edit Leads', resource: 'leads', action: 'edit', level: 2 },
+  { name: 'delete_lead', description: 'Delete Leads', resource: 'leads', action: 'delete', level: 1 },
+  { name: 'view_tasks', description: 'View Tasks', resource: 'tasks', action: 'view', level: 2 },
+  { name: 'create_task', description: 'Create Tasks', resource: 'tasks', action: 'create', level: 2 },
+  { name: 'edit_task', description: 'Edit Tasks', resource: 'tasks', action: 'edit', level: 2 },
+  { name: 'delete_task', description: 'Delete Tasks', resource: 'tasks', action: 'delete', level: 1 },
+  { name: 'view_reports', description: 'View Reports', resource: 'reports', action: 'view', level: 1 },
+  { name: 'view_audit_log', description: 'View Audit Log', resource: 'audit', action: 'view', level: 0 },
+  { name: 'view_settings', description: 'View Settings', resource: 'settings', action: 'view', level: 0 },
+  { name: 'view_customer_portal', description: 'View Customer Portal', resource: 'customer_portal', action: 'view', level: 0 },
+  { name: 'view_orders', description: 'View Orders', resource: 'orders', action: 'view', level: 3 },
+  { name: 'view_tickets', description: 'View Tickets', resource: 'tickets', action: 'view', level: 3 },
 ];
 
 const ROLES = [
-  {
-    name: RoleEnum.ADMIN,
-    description: 'Full system access with all permissions',
-    level: 0,
-  },
-  {
-    name: RoleEnum.MANAGER,
-    description: 'Manage users, leads, tasks and view reports',
-    level: 1,
-  },
-  {
-    name: RoleEnum.AGENT,
-    description: 'Handle leads and tasks assigned to them',
-    level: 2,
-  },
-  {
-    name: RoleEnum.CUSTOMER,
-    description: 'Basic access to own profile and assigned tasks',
-    level: 3,
-  },
+  { name: RoleEnum.ADMIN, description: 'Full system access', level: 0 },
+  { name: RoleEnum.MANAGER, description: 'Manage users and view reports', level: 1 },
+  { name: RoleEnum.AGENT, description: 'Handle leads and tasks', level: 2 },
+  { name: RoleEnum.CUSTOMER, description: 'Basic access', level: 3 },
 ];
 
 const USERS = [
-  // Admin user
-  {
-    email: 'admin@system.com',
-    password: 'Admin@123',
-    firstName: 'System',
-    lastName: 'Administrator',
-    role: RoleEnum.ADMIN,
-    isActive: true,
-  },
-  // Manager users
-  {
-    email: 'john.manager@company.com',
-    password: 'Manager@123',
-    firstName: 'John',
-    lastName: 'Smith',
-    role: RoleEnum.MANAGER,
-    isActive: true,
-  },
-  {
-    email: 'sarah.manager@company.com',
-    password: 'Manager@123',
-    firstName: 'Sarah',
-    lastName: 'Johnson',
-    role: RoleEnum.MANAGER,
-    isActive: true,
-  },
-  // Agent users
-  {
-    email: 'mike.agent@company.com',
-    password: 'Agent@123',
-    firstName: 'Mike',
-    lastName: 'Williams',
-    role: RoleEnum.AGENT,
-    isActive: true,
-  },
-  {
-    email: 'emily.agent@company.com',
-    password: 'Agent@123',
-    firstName: 'Emily',
-    lastName: 'Brown',
-    role: RoleEnum.AGENT,
-    isActive: true,
-  },
-  {
-    email: 'david.agent@company.com',
-    password: 'Agent@123',
-    firstName: 'David',
-    lastName: 'Davis',
-    role: RoleEnum.AGENT,
-    isActive: false,
-  },
-  // Customer users
-  {
-    email: 'alice.customer@client.com',
-    password: 'Customer@123',
-    firstName: 'Alice',
-    lastName: 'Miller',
-    role: RoleEnum.CUSTOMER,
-    isActive: true,
-  },
-  {
-    email: 'bob.customer@client.com',
-    password: 'Customer@123',
-    firstName: 'Bob',
-    lastName: 'Wilson',
-    role: RoleEnum.CUSTOMER,
-    isActive: true,
-  },
+  { email: 'admin@system.com', password: 'Admin@123', firstName: 'System', lastName: 'Administrator', role: RoleEnum.ADMIN, isActive: true },
+  { email: 'john.manager@company.com', password: 'Manager@123', firstName: 'John', lastName: 'Smith', role: RoleEnum.MANAGER, isActive: true },
+  { email: 'sarah.manager@company.com', password: 'Manager@123', firstName: 'Sarah', lastName: 'Johnson', role: RoleEnum.MANAGER, isActive: true },
+  { email: 'mike.agent@company.com', password: 'Agent@123', firstName: 'Mike', lastName: 'Williams', role: RoleEnum.AGENT, isActive: true },
+  { email: 'emily.agent@company.com', password: 'Agent@123', firstName: 'Emily', lastName: 'Brown', role: RoleEnum.AGENT, isActive: true },
+  { email: 'david.agent@company.com', password: 'Agent@123', firstName: 'David', lastName: 'Davis', role: RoleEnum.AGENT, isActive: false },
+  { email: 'alice.customer@client.com', password: 'Customer@123', firstName: 'Alice', lastName: 'Miller', role: RoleEnum.CUSTOMER, isActive: true },
+  { email: 'bob.customer@client.com', password: 'Customer@123', firstName: 'Bob', lastName: 'Wilson', role: RoleEnum.CUSTOMER, isActive: true },
 ];
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('Starting database seed...');
 
-  console.log('📝 Creating permissions...');
+  console.log('Creating permissions...');
   for (const perm of PERMISSIONS) {
     await prisma.permission.upsert({
       where: { name: perm.name },
@@ -347,9 +66,9 @@ async function main() {
       create: perm,
     });
   }
-  console.log(`✓ Created ${PERMISSIONS.length} permissions`);
+  console.log(`Created ${PERMISSIONS.length} permissions`);
 
-  console.log('👥 Creating roles...');
+  console.log('Creating roles...');
   for (const role of ROLES) {
     await prisma.role.upsert({
       where: { name: role.name },
@@ -357,146 +76,108 @@ async function main() {
       create: role,
     });
   }
-  console.log(`✓ Created ${ROLES.length} roles`);
+  console.log(`Created ${ROLES.length} roles`);
 
-  console.log('👤 Creating users...');
-
+  console.log('Creating users...');
   for (const user of USERS) {
     const hashedPwd = await bcrypt.hash(user.password, 10);
     await prisma.user.upsert({
       where: { email: user.email },
-      update: {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-      },
-      create: {
-        email: user.email,
-        password: hashedPwd,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-        isActive: user.isActive,
-      },
+      update: { firstName: user.firstName, lastName: user.lastName, role: user.role, isActive: user.isActive },
+      create: { email: user.email, password: hashedPwd, firstName: user.firstName, lastName: user.lastName, role: user.role, isActive: user.isActive },
     });
   }
-  console.log(`✓ Created ${USERS.length} users`);
+  console.log(`Created ${USERS.length} users`);
 
-  console.log('🔗 Assigning permissions to roles...');
-
+  console.log('Assigning permissions to roles...');
+  
   await prisma.role.update({
     where: { name: RoleEnum.ADMIN },
     data: { permissions: PERMISSIONS.map((p) => p.name) },
   });
 
-  const managerPermissions = PERMISSIONS.filter(
-    (p) =>
-      p.level >= 1 && p.name !== 'users.delete' && p.name !== 'roles.delete',
-  ).map((p) => p.name);
+  const managerPermissions = PERMISSIONS.filter((p) => p.level >= 1).map((p) => p.name);
   await prisma.role.update({
     where: { name: RoleEnum.MANAGER },
     data: { permissions: managerPermissions },
   });
 
-  const agentPermissions = PERMISSIONS.filter(
-    (p) =>
-      p.level >= 2 &&
-      [
-        'leads.read',
-        'leads.create',
-        'leads.update',
-        'tasks.read',
-        'tasks.create',
-        'tasks.update',
-        'profile.read',
-        'profile.update',
-      ].includes(p.name),
-  ).map((p) => p.name);
+  const agentPermissions = PERMISSIONS.filter((p) => p.level >= 2).map((p) => p.name);
   await prisma.role.update({
     where: { name: RoleEnum.AGENT },
     data: { permissions: agentPermissions },
   });
 
-  const customerPermissions = PERMISSIONS.filter(
-    (p) => p.level >= 3 && ['profile.read', 'profile.update'].includes(p.name),
-  ).map((p) => p.name);
+  const customerPermissions = PERMISSIONS.filter((p) => p.level >= 3).map((p) => p.name);
   await prisma.role.update({
     where: { name: RoleEnum.CUSTOMER },
     data: { permissions: customerPermissions },
   });
 
-  console.log('✓ Assigned permissions to all roles');
+  console.log('Assigned permissions to roles');
 
-  console.log('🔐 Creating audit log entries...');
-  const adminUser = await prisma.user.findUnique({
-    where: { email: 'admin@system.com' },
-  });
+  // Assign permissions to users directly based on role
+  console.log('Assigning permissions to users...');
+  
+  const adminUser = await prisma.user.findUnique({ where: { email: 'admin@system.com' } });
+  if (adminUser) {
+    await prisma.user.update({
+      where: { id: adminUser.id },
+      data: { permissions: { connect: PERMISSIONS.map((p) => ({ name: p.name })) } },
+    });
+    console.log('Admin assigned all permissions');
+  }
+
+  const managerUser = await prisma.user.findUnique({ where: { email: 'john.manager@company.com' } });
+  if (managerUser) {
+    const managerPerms = PERMISSIONS.filter((p) => p.level >= 1).map((p) => p.name);
+    await prisma.user.update({
+      where: { id: managerUser.id },
+      data: { permissions: { connect: managerPerms.map((name) => ({ name })) } },
+    });
+    console.log('Manager assigned permissions');
+  }
+
+  const agentUser = await prisma.user.findUnique({ where: { email: 'mike.agent@company.com' } });
+  if (agentUser) {
+    const agentPerms = PERMISSIONS.filter((p) => p.level >= 2).map((p) => p.name);
+    await prisma.user.update({
+      where: { id: agentUser.id },
+      data: { permissions: { connect: agentPerms.map((name) => ({ name })) } },
+    });
+    console.log('Agent assigned permissions');
+  }
+
+  const customerUser = await prisma.user.findUnique({ where: { email: 'alice.customer@client.com' } });
+  if (customerUser) {
+    const customerPerms = PERMISSIONS.filter((p) => p.level >= 3).map((p) => p.name);
+    await prisma.user.update({
+      where: { id: customerUser.id },
+      data: { permissions: { connect: customerPerms.map((name) => ({ name })) } },
+    });
+    console.log('Customer assigned permissions');
+  }
+
+  console.log('Created audit log entries...');
   if (adminUser) {
     await prisma.auditLog.createMany({
       data: [
-        {
-          userId: adminUser.id,
-          userEmail: adminUser.email,
-          action: 'LOGIN',
-          resource: 'auth',
-          status: 'success',
-          ipAddress: '192.168.1.1',
-        },
-        {
-          userId: adminUser.id,
-          userEmail: adminUser.email,
-          action: 'CREATE',
-          resource: 'users',
-          status: 'success',
-          ipAddress: '192.168.1.1',
-        },
-        {
-          userId: adminUser.id,
-          userEmail: adminUser.email,
-          action: 'CREATE',
-          resource: 'roles',
-          status: 'success',
-          ipAddress: '192.168.1.1',
-        },
-        {
-          userId: adminUser.id,
-          userEmail: adminUser.email,
-          action: 'PERMISSION_CHANGE',
-          resource: 'roles',
-          status: 'success',
-          ipAddress: '192.168.1.1',
-        },
-        {
-          userId: adminUser.id,
-          userEmail: adminUser.email,
-          action: 'READ',
-          resource: 'audit',
-          status: 'success',
-          ipAddress: '192.168.1.1',
-        },
+        { userId: adminUser.id, userEmail: adminUser.email, action: 'LOGIN', resource: 'auth', status: 'success' },
+        { userId: adminUser.id, userEmail: adminUser.email, action: 'CREATE', resource: 'users', status: 'success' },
+        { userId: adminUser.id, userEmail: adminUser.email, action: 'PERMISSION_CHANGE', resource: 'roles', status: 'success' },
       ],
     });
   }
-  console.log('✓ Created audit log entries');
 
-  console.log('✅ Database seed completed successfully!');
-  console.log('\n📊 Summary:');
-  console.log(`   - ${PERMISSIONS.length} permissions`);
-  console.log(`   - ${ROLES.length} roles`);
-  console.log(`   - ${USERS.length} users`);
-  console.log('\n🔑 Default Credentials:');
-  console.log('   Admin:   admin@system.com / Admin@123');
-  console.log('   Manager: john.manager@company.com / Manager@123');
-  console.log('   Agent:   mike.agent@company.com / Agent@123');
-  console.log('   Customer: alice.customer@client.com / Customer@123');
+  console.log('Database seed completed!');
+  console.log('\nPermissions assigned to users directly');
+  console.log('\nCredentials:');
+  console.log('Admin: admin@system.com / Admin@123');
+  console.log('Manager: john.manager@company.com / Manager@123');
+  console.log('Agent: mike.agent@company.com / Agent@123');
+  console.log('Customer: alice.customer@client.com / Customer@123');
 }
 
 main()
-  .catch((e) => {
-    console.error('❌ Seed error:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .catch((e) => { console.error('Seed error:', e); process.exit(1); })
+  .finally(async () => { await prisma.$disconnect(); });

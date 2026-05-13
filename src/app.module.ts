@@ -9,6 +9,7 @@ import { RolesModule } from './roles/roles.module';
 import { PermissionsModule } from './permissions/permissions.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { CustomerPortalModule } from './customer-portal/customer-portal.module';
 
 @Module({
   imports: [
@@ -18,9 +19,7 @@ import { PrismaModule } from './prisma/prisma.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
-        signOptions: {
-          expiresIn: configService.get('JWT_EXPIRES_IN') || '15m',
-        },
+        signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') || '15m' },
       }),
     }),
     PrismaModule,
@@ -29,6 +28,7 @@ import { PrismaModule } from './prisma/prisma.module';
     RolesModule,
     PermissionsModule,
     AuditLogModule,
+    CustomerPortalModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: JwtAuthGuard }],
 })
