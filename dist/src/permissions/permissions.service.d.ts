@@ -44,5 +44,32 @@ export declare class PermissionsService {
     remove(id: string, deletedBy: UserProfile): Promise<{
         message: string;
     }>;
+    getGrantable(user: UserProfile): Promise<{
+        id: string;
+        name: string;
+        description: string;
+        resource: string;
+        action: string;
+        level: number;
+        isActive: boolean;
+    }[]>;
+    grant(userId: string, permissionName: string, grantedBy: UserProfile): Promise<{
+        id: string;
+        isActive: boolean;
+        role: import(".prisma/client").$Enums.RoleEnum;
+        email: string;
+        firstName: string;
+        lastName: string;
+        grantedPermissions: string[];
+    }>;
+    revoke(userId: string, permissionName: string, revokedBy: UserProfile): Promise<{
+        id: string;
+        isActive: boolean;
+        role: import(".prisma/client").$Enums.RoleEnum;
+        email: string;
+        firstName: string;
+        lastName: string;
+        grantedPermissions: string[];
+    }>;
     canGrantPermission(user: UserProfile, permissionLevel: number): boolean;
 }

@@ -15,8 +15,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuditLogController = void 0;
 const common_1 = require("@nestjs/common");
 const audit_log_service_1 = require("./audit-log.service");
-const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
-const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const client_1 = require("@prisma/client");
 let AuditLogController = class AuditLogController {
@@ -66,7 +64,6 @@ __decorate([
 ], AuditLogController.prototype, "findByResource", null);
 exports.AuditLogController = AuditLogController = __decorate([
     (0, common_1.Controller)('audit'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [audit_log_service_1.AuditLogService])
 ], AuditLogController);
 //# sourceMappingURL=audit-log.controller.js.map

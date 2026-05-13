@@ -16,6 +16,7 @@ const config_1 = require("@nestjs/config");
 const core_1 = require("@nestjs/core");
 const public_decorator_1 = require("../decorators/public.decorator");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const blacklist_1 = require("../blacklist");
 let JwtAuthGuard = class JwtAuthGuard {
     constructor(jwtService, configService, reflector, prisma) {
         this.jwtService = jwtService;
@@ -34,6 +35,8 @@ let JwtAuthGuard = class JwtAuthGuard {
         const token = this.extractTokenFromHeader(request);
         if (!token)
             throw new common_1.UnauthorizedException('No token provided');
+        if (blacklist_1.blacklistedTokens.has(token))
+            throw new common_1.UnauthorizedException('Token has been revoked');
         try {
             const payload = this.jwtService.verify(token, {
                 secret: this.configService.get('JWT_SECRET'),
@@ -53,12 +56,18 @@ let JwtAuthGuard = class JwtAuthGuard {
     }
     extractTokenFromHeader(request) {
         const authHeader = request.headers.authorization;
-        if (!authHeader)
-            return undefined;
-        const [type, token] = authHeader.split(' ');
-        if (type !== 'Bearer' || !token)
-            return undefined;
-        return token;
+        if (authHeader) {
+            const [type, token] = authHeader.split(' ');
+            if (type === 'Bearer' && token)
+                return token;
+        }
+        const cookies = request.headers.cookie;
+        if (cookies) {
+            const match = cookies.match(/accessToken=([^;]+)/);
+            if (match)
+                return match[1];
+        }
+        return undefined;
     }
 };
 exports.JwtAuthGuard = JwtAuthGuard;

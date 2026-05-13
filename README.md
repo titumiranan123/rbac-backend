@@ -1,78 +1,24 @@
 # RBAC Backend
 
-Role-Based Access Control System with NestJS + Prisma + Zod
+Role-Based Access Control System with NestJS + Prisma + PostgreSQL
 
 ## Tech Stack
 
-- **Framework:** NestJS
-- **ORM:** Prisma
+- **Framework:** NestJS 11
+- **ORM:** Prisma 7
+- **Database:** PostgreSQL (Neon)
+- **Auth:** JWT (15min access, 7d refresh)
 - **Validation:** Zod
-- **Database:** PostgreSQL
-- **Authentication:** JWT (No Passport)
 
-## Features
+---
 
-### Authentication
-- JWT Access Token (15 min expiry, stored in memory)
-- Refresh Token (7 days, httpOnly cookie)
-- Session Blacklist (logout invalidates refresh token)
-- Brute-force Protection (5 failed attempts → 15 min block)
+## Quick Start
 
-### Role Management
-- 4 Roles: Admin, Manager, Agent, Customer
-- Role Hierarchy: Admin (0) > Manager (1) > Agent (2) > Customer (3)
-- Hierarchy-based permissions (upper role manages lower)
+### Prerequisites
 
-### Permission System
-- Dynamic Permission Atoms (21 predefined permissions)
-- Grant Ceiling Enforce (can't grant permissions you don't have)
-- Permission-based access control (not role-based routing)
-
-### User Lifecycle
-- Create, Read, Update, Delete (CRUD)
-- Suspend (Admin/Manager)
-- Ban (Admin only)
-- Activate (Admin/Manager)
-
-### Security
-- Rate Limiting (100 requests per 15 min)
-- Password Hashing (bcrypt, 10 rounds)
-- Append-only Audit Log (no delete)
-- CORS enabled for frontend
-
-### Modules
-- Dashboard
-- Users (CRUD + permissions)
-- Leads (stub)
-- Tasks (stub)
-- Reports (stub)
-- Audit Log (append-only)
-- Customer Portal (tickets & orders)
-- Settings (stub)
-
-## Role Hierarchy
-
-```
-Admin (0) > Manager (1) > Agent (2) > Customer (3)
-```
-
-| Role | Can Manage | Special |
-|------|------------|---------|
-| Admin | All roles | Full access, can ban |
-| Manager | Agent, Customer | Can suspend/activate |
-| Agent | Customer | Limited access |
-| Customer | - | Customer Portal only |
-
-## Permission Atoms
-
-```
-view_dashboard, view_users, create_user, edit_user, delete_user
-suspend_user, ban_user, view_leads, create_lead, edit_lead, delete_lead
-view_tasks, create_task, edit_task, delete_task, view_reports
-view_audit_log, view_settings, view_customer_portal, view_orders, view_tickets
-```
-
-## Setup
+- Node.js 18+
+- PostgreSQL database (local or Neon)
+- npm or yarn
 
 ### 1. Install Dependencies
 
@@ -80,54 +26,176 @@ view_audit_log, view_settings, view_customer_portal, view_orders, view_tickets
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Setup Environment
 
 ```bash
 cp .env.example .env
-# Edit .env with your database credentials
 ```
 
-**.env example:**
+**Edit `.env` file:**
+
 ```env
-DATABASE_URL="postgresql://user:password@localhost:5433/rbac_db"
-JWT_SECRET="your-jwt-secret"
+# Database - Use your PostgreSQL connection string
+DATABASE_URL="postgresql://user:password@host:5433/database?sslmode=require"
+
+# JWT Secrets - Generate random strings
+JWT_SECRET="your-jwt-secret-min-32-chars"
+JWT_REFRESH_SECRET="your-refresh-secret-min-32-chars"
+
+# Token Expiry
 JWT_EXPIRES_IN="15m"
-JWT_REFRESH_SECRET="your-refresh-secret"
 JWT_REFRESH_EXPIRES_IN="7d"
-PORT=3000
+
+# Server
+PORT=4000
 NODE_ENV=development
-CORS_ORIGIN=http://localhost:3001
+CORS_ORIGIN=http://localhost:3000
 ```
 
 ### 3. Setup Database
 
 ```bash
 # Generate Prisma Client
-npx prisma generate
+npm run db:generate
 
-# Push schema to database
-npx prisma db push
+# Push schema to database (creates tables)
+npm run db:push
 
-# Seed default permissions (optional)
-curl -X POST http://localhost:3000/api/permissions/seed \
-  -H "Authorization: Bearer <admin_token>"
+# OR run migrations (for production)
+npm run db:migrate
 ```
 
-### 4. Run Server
+### 4. Seed Data
 
 ```bash
-# Development
+# Seed permissions and default admin user
+npm run seed
+```
+
+**Default Users:**
+
+| Email | Password | Role |
+|-------|----------|------|
+| admin@system.com | Admin@123 | ADMIN |
+| john.manager@company.com | Manager@123 | MANAGER |
+| mike.agent@company.com | Agent@123 | AGENT |
+| alice.customer@client.com | Customer@123 | CUSTOMER |
+
+### 5. Run Server
+
+```bash
+# Development (with hot reload)
 npm run start:dev
 
 # Production
 npm run build
+npm run start:prod
+```
+
+**Server runs at:** http://localhost:4000/api
+
+---
+
+## Database Setup (Neon PostgreSQL)
+
+If using Neon (cloud PostgreSQL):
+
+1. Create project at https://neon.tech
+2. Copy connection string from dashboard
+3. Update `DATABASE_URL` in `.env`
+
+```env
+DATABASE_URL="postgresql://user:password@ep-xxx-xxx-123456.us-east-1.aws.neon.tech/neondb?sslmode=require"
+```
+
+---
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run start:dev` | Start in development mode |
+| `npm run start:prod` | Start production server |
+| `npm run build` | Build for production |
+| `npm run db:generate` | Generate Prisma client |
+| `npm run db:push` | Push schema to database |
+| `npm run db:migrate` | Run database migrations |
+| `npm run db:seed` | Seed default data |
+| `npm run db:studio` | Open Prisma Studio |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Run tests |
+
+---
+
+## Production Deployment
+
+### Build
+
+```bash
+npm run build
+```
+
+### Run
+
+```bash
+# Set environment variables
+export DATABASE_URL="your-production-db-url"
+export JWT_SECRET="your-production-secret"
+export JWT_REFRESH_SECRET="your-production-refresh-secret"
+export NODE_ENV="production"
+
+# Start server
 node dist/src/main.js
 ```
 
-## Default Admin
+### Docker (Optional)
 
-- **Email:** admin@system.com
-- **Password:** Admin@123
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --production
+COPY dist ./dist
+EXPOSE 4000
+CMD ["node", "dist/src/main.js"]
+```
+
+---
+
+## Features
+
+### Authentication
+- JWT Access Token (15 min expiry)
+- Refresh Token (7 days, httpOnly cookie)
+- Session Blacklist (logout invalidates tokens)
+- Brute-force Protection (5 failed attempts → 15 min block)
+
+### Role Hierarchy
+```
+Admin (0) > Manager (1) > Agent (2) > Customer (3)
+```
+
+| Role | Can Manage | Permissions |
+|------|------------|-------------|
+| Admin | All roles | Full access, can ban users |
+| Manager | Agent, Customer | Can suspend/activate, grant permissions |
+| Agent | Customer | Limited view access |
+| Customer | - | Customer Portal only |
+
+### Permission Atoms (21 total)
+```
+view_dashboard, view_users, create_user, edit_user, delete_user
+suspend_user, ban_user, view_leads, create_lead, edit_lead, delete_lead
+view_tasks, create_task, edit_task, delete_task, view_reports
+view_audit_log, view_settings, view_customer_portal, view_orders, view_tickets
+```
+
+### Grant Ceiling
+- Can't grant permissions you don't have
+- Admin can grant all
+- Manager can grant permissions at level ≥ 1
+
+---
 
 ## API Endpoints
 
@@ -135,197 +203,117 @@ node dist/src/main.js
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | /api/auth/register | Public | Register new user |
-| POST | /api/auth/login | Public | Login user |
-| POST | /api/auth/refresh | Public | Refresh access token (cookie) |
-| POST | /api/auth/logout | Protected | Logout + blacklist token |
+| POST | /api/auth/register | Public | Register user |
+| POST | /api/auth/login | Public | Login |
+| POST | /api/auth/refresh | Public | Refresh token |
+| POST | /api/auth/logout | Protected | Logout |
 | GET | /api/auth/me | Protected | Get current user |
 
 ### Users
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | /api/users | Admin/Manager | List all users (paginated) |
-| GET | /api/users/:id | Admin/Manager | Get user by ID |
+| GET | /api/users | Admin/Manager | List users |
+| GET | /api/users/:id | Admin/Manager | Get user |
 | POST | /api/users | Admin | Create user |
 | PUT | /api/users/:id | Admin/Manager | Update user |
 | DELETE | /api/users/:id | Admin | Delete user |
-| PATCH | /api/users/:id/suspend | Admin/Manager | Suspend user |
-| PATCH | /api/users/:id/ban | Admin | Ban user |
-| PATCH | /api/users/:id/activate | Admin/Manager | Activate user |
+| PATCH | /api/users/:id/suspend | Admin/Manager | Suspend |
+| PATCH | /api/users/:id/ban | Admin | Ban |
+| PATCH | /api/users/:id/activate | Admin/Manager | Activate |
 | POST | /api/users/:id/role | Admin | Assign role |
-| POST | /api/users/:id/permissions/:permission | Admin/Manager | Grant permission* |
-| DELETE | /api/users/:id/permissions/:permission | Admin/Manager | Revoke permission* |
-
-*Grant Ceiling enforced - granter must have the permission
-
-### Roles
-
-| Method | Endpoint | Auth | Description |
-|--------|----------|------|-------------|
-| GET | /api/roles | Admin/Manager | List all roles |
-| GET | /api/roles/:name | Admin/Manager | Get role by name |
+| POST | /api/users/:id/permissions/:p | Admin/Manager | Grant permission |
+| DELETE | /api/users/:id/permissions/:p | Admin/Manager | Revoke permission |
 
 ### Permissions
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| POST | /api/permissions/seed | Admin | Seed default permissions |
-| GET | /api/permissions | Admin/Manager | List all permissions |
-| GET | /api/permissions/:id | Admin/Manager | Get permission by ID |
-| POST | /api/permissions | Admin | Create permission |
-| PUT | /api/permissions/:id | Admin | Update permission |
-| DELETE | /api/permissions/:id | Admin | Delete permission |
+| GET | /api/permissions | Public | List all |
+| GET | /api/permissions/grantable | Admin/Manager | Grantable perms |
+| POST | /api/permissions | Admin | Create |
+| PUT | /api/permissions/:id | Admin | Update |
+| DELETE | /api/permissions/:id | Admin | Delete |
 
-### Audit Logs
+### Audit
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | /api/audit | Admin/Manager | List all logs (paginated) |
-| GET | /api/audit?page=1&limit=20 | Admin/Manager | With pagination |
-| GET | /api/audit?action=LOGIN&from=&to= | Admin/Manager | Filter by action/date |
-| GET | /api/audit/user/:userId | Admin/Manager | Logs for specific user |
-| GET | /api/audit/resource/:resource/:id | Admin/Manager | Logs for resource |
-
-⚠️ **Append-only**: No DELETE endpoint for audit logs
+| GET | /api/audit | Admin/Manager | List logs |
+| GET | /api/audit/user/:userId | Admin/Manager | User's logs |
+| GET | /api/audit/resource/:r/:id | Admin/Manager | Resource logs |
 
 ### Customer Portal
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | /api/customer-portal/tickets | CUSTOMER only | Get customer's tickets |
-| GET | /api/customer-portal/orders | CUSTOMER only | Get customer's orders |
+| GET | /api/customer-portal/tickets | Customer | Get tickets |
+| GET | /api/customer-portal/orders | Customer | Get orders |
 
-⚠️ **Role-restricted**: ADMIN/MANAGER will receive 403 Forbidden
-
-## Request Headers
-
-```bash
-Authorization: Bearer <access_token>
-Content-Type: application/json
-```
-
-For cookie-based requests (refresh):
-```bash
-Cookie: refreshToken=<refresh_token>
-```
-
-## Response Format
-
-### Success
-
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIs...",
-  "user": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "firstName": "John",
-    "lastName": "Doe",
-    "role": "ADMIN",
-    "isActive": true,
-    "grantedPermissions": []
-  }
-}
-```
-
-### Pagination
-
-```json
-{
-  "data": [...],
-  "meta": {
-    "total": 100,
-    "page": 1,
-    "limit": 20,
-    "totalPages": 5
-  }
-}
-```
-
-### Error
-
-```json
-{
-  "statusCode": 403,
-  "message": "You do not have permission to grant this permission",
-  "error": "Forbidden"
-}
-```
-
-## Database Schema
-
-### User
-```sql
-id          UUID PRIMARY KEY
-email       UNIQUE
-password    VARCHAR
-firstName   VARCHAR
-lastName    VARCHAR
-role        ENUM('ADMIN', 'MANAGER', 'AGENT', 'CUSTOMER')
-isActive    BOOLEAN DEFAULT true
-grantedPermissions JSONB DEFAULT '[]'
-permissions Permission[] (relation)
-auditLogs   AuditLog[] (relation)
-```
-
-### Permission
-```sql
-id          UUID PRIMARY KEY
-name        UNIQUE
-description VARCHAR
-resource    VARCHAR
-action      VARCHAR
-level       INT DEFAULT 0
-```
-
-### AuditLog
-```sql
-id         UUID PRIMARY KEY
-userId     UUID (FK to User)
-action     ENUM
-resource   VARCHAR
-resourceId VARCHAR
-oldData    JSONB
-newData    JSONB
-ipAddress  VARCHAR
-userAgent  VARCHAR
-status     VARCHAR
-timestamp  DATETIME DEFAULT NOW()
-```
-
-## Security Implementation
-
-### Session Blacklist
-- Logout adds refresh token to in-memory Set
-- Refresh with blacklisted token returns 401
-- Tokens cleared on server restart (acceptable for demo)
-
-### Brute-force Protection
-- In-memory Map tracks failed attempts per IP
-- 5 failed attempts → 15 minute block
-- Block returns 403 Forbidden
-
-### Grant Ceiling
-- Before granting permission, check granter's permissions
-- If granter doesn't have permission → 403 Forbidden
-- Applied to both grant and revoke operations
-
-## Postman Collection
-
-Import `RBAC API.postman_collection.json` for API testing.
+---
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| DATABASE_URL | PostgreSQL connection string | - |
-| JWT_SECRET | Access token secret | - |
-| JWT_EXPIRES_IN | Token expiry | 15m |
-| JWT_REFRESH_SECRET | Refresh token secret | - |
-| JWT_REFRESH_EXPIRES_IN | Refresh token expiry | 7d |
-| PORT | Server port | 3000 |
-| CORS_ORIGIN | Allowed frontend URL | http://localhost:3000 |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| DATABASE_URL | Yes | - | PostgreSQL connection string |
+| JWT_SECRET | Yes | - | Access token secret (min 32 chars) |
+| JWT_REFRESH_SECRET | Yes | - | Refresh token secret |
+| JWT_EXPIRES_IN | No | 15m | Access token expiry |
+| JWT_REFRESH_EXPIRES_IN | No | 7d | Refresh token expiry |
+| PORT | No | 4000 | Server port |
+| NODE_ENV | No | development | Environment |
+| CORS_ORIGIN | No | http://localhost:3000 | Allowed frontend URL |
+
+---
+
+## Testing API
+
+### Login
+
+```bash
+curl -X POST http://localhost:4000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@system.com","password":"Admin@123"}'
+```
+
+### Get Current User
+
+```bash
+curl http://localhost:4000/api/auth/me \
+  -H "Authorization: Bearer <access_token>"
+```
+
+### List Users
+
+```bash
+curl http://localhost:4000/api/users \
+  -H "Authorization: Bearer <access_token>"
+```
+
+---
+
+## Troubleshooting
+
+### Database Connection Error
+- Check DATABASE_URL format
+- Ensure PostgreSQL is running
+- For Neon: add `?sslmode=require` at end
+
+### Prisma Client Not Found
+```bash
+npm run db:generate
+```
+
+### Token Expired
+- Login again to get new token
+- Refresh token expires after 7 days
+
+### Permission Denied (403)
+- Check your role has required permission
+- Manager can only grant level ≥ 1 permissions
+
+---
 
 ## License
 

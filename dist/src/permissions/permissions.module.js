@@ -10,6 +10,7 @@ exports.PermissionsModule = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_module_1 = require("../prisma/prisma.module");
 const audit_log_module_1 = require("../audit-log/audit-log.module");
+const auth_module_1 = require("../auth/auth.module");
 const permissions_service_1 = require("./permissions.service");
 const permissions_controller_1 = require("./permissions.controller");
 let PermissionsModule = class PermissionsModule {
@@ -17,7 +18,7 @@ let PermissionsModule = class PermissionsModule {
 exports.PermissionsModule = PermissionsModule;
 exports.PermissionsModule = PermissionsModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, audit_log_module_1.AuditLogModule],
+        imports: [prisma_module_1.PrismaModule, audit_log_module_1.AuditLogModule, auth_module_1.AuthModule],
         providers: [permissions_service_1.PermissionsService],
         controllers: [permissions_controller_1.PermissionsController],
         exports: [permissions_service_1.PermissionsService],

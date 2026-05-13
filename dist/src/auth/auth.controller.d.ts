@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { UserProfile } from '../types';
 interface Cookies {
     refreshToken?: string;
+    accessToken?: string;
 }
 interface AuthRequest extends Request {
     cookies: Cookies;
@@ -40,6 +41,7 @@ export declare class AuthController {
     }>;
     me(user: UserProfile): UserProfile;
     private setRefreshTokenCookie;
+    private setAccessTokenCookie;
     private clearRefreshTokenCookie;
 }
 export {};

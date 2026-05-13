@@ -30,13 +30,9 @@ let AuthController = class AuthController {
         return { accessToken: result.accessToken, user: result.user };
     }
     async login(dto, req, res) {
-        console.log('Login attempt:', dto);
         const result = await this.authService.login(dto, req.ip, req.headers['user-agent']);
+        this.setAccessTokenCookie(res, result.accessToken);
         this.setRefreshTokenCookie(res, result.refreshToken);
-        console.log('Login successful for user:', {
-            accessToken: result.accessToken,
-            user: result.user,
-        });
         return { accessToken: result.accessToken, user: result.user };
     }
     async refresh(req, res) {
@@ -49,7 +45,8 @@ let AuthController = class AuthController {
     }
     async logout(user, req, res) {
         const refreshToken = req.cookies?.refreshToken || '';
-        await this.authService.logout(user, refreshToken, req.ip, req.headers['user-agent']);
+        const accessToken = req.cookies?.accessToken || '';
+        await this.authService.logout(user, refreshToken, accessToken, req.ip, req.headers['user-agent']);
         this.clearRefreshTokenCookie(res);
         return { message: 'Logged out successfully' };
     }
@@ -65,8 +62,18 @@ let AuthController = class AuthController {
             path: '/',
         });
     }
+    setAccessTokenCookie(res, accessToken) {
+        res.cookie('accessToken', accessToken, {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 15 * 60 * 1000,
+            path: '/',
+        });
+    }
     clearRefreshTokenCookie(res) {
         res.clearCookie('refreshToken', { path: '/' });
+        res.clearCookie('accessToken', { path: '/' });
     }
 };
 exports.AuthController = AuthController;

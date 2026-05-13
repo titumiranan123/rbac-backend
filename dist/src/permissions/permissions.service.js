@@ -149,6 +149,154 @@ let PermissionsService = class PermissionsService {
         await this.prisma.permission.delete({ where: { id } });
         return { message: 'Permission deleted successfully' };
     }
+    async getGrantable(user) {
+        if (user.role === 'ADMIN') {
+            return this.prisma.permission.findMany({
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    resource: true,
+                    action: true,
+                    level: true,
+                    isActive: true,
+                },
+            });
+        }
+        if (user.role === 'MANAGER') {
+            const rolePermissions = await this.prisma.rolePermission.findMany({
+                where: { role: user.role },
+                include: { permission: true },
+            });
+            const grantedPermissions = await this.prisma.user.findUnique({
+                where: { id: user.id },
+                select: { grantedPermissions: true },
+            });
+            const userPermNames = [
+                ...rolePermissions.map((rp) => rp.permission.name),
+                ...(grantedPermissions?.grantedPermissions || []),
+            ];
+            return this.prisma.permission.findMany({
+                where: { name: { in: userPermNames } },
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    resource: true,
+                    action: true,
+                    level: true,
+                    isActive: true,
+                },
+            });
+        }
+        return [];
+    }
+    async grant(userId, permissionName, grantedBy) {
+        if (grantedBy.role === 'AGENT' || grantedBy.role === 'CUSTOMER') {
+            throw new common_1.ForbiddenException('You cannot grant permissions');
+        }
+        if (grantedBy.role === 'MANAGER') {
+            const managerRolePermissions = await this.prisma.rolePermission.findMany({
+                where: { role: grantedBy.role },
+                include: { permission: true },
+            });
+            const managerGrantedPermissions = await this.prisma.user.findUnique({
+                where: { id: grantedBy.id },
+                select: { grantedPermissions: true },
+            });
+            const managerPermNames = [
+                ...managerRolePermissions.map((rp) => rp.permission.name),
+                ...(managerGrantedPermissions?.grantedPermissions || []),
+            ];
+            if (!managerPermNames.includes(permissionName)) {
+                throw new common_1.ForbiddenException('You can only grant permissions you have');
+            }
+        }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const currentPerms = user.grantedPermissions || [];
+        if (!currentPerms.includes(permissionName)) {
+            await this.prisma.user.update({
+                where: { id: userId },
+                data: { grantedPermissions: { push: permissionName } },
+            });
+            await this.auditLogService.log({
+                userId: grantedBy.id,
+                userEmail: grantedBy.email,
+                action: client_1.AuditAction.PERMISSION_CHANGE,
+                resource: 'user',
+                resourceId: userId,
+                newData: { grantedPermission: permissionName },
+            });
+        }
+        return this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                grantedPermissions: true,
+            },
+        });
+    }
+    async revoke(userId, permissionName, revokedBy) {
+        if (revokedBy.role === 'AGENT' || revokedBy.role === 'CUSTOMER') {
+            throw new common_1.ForbiddenException('You cannot revoke permissions');
+        }
+        if (revokedBy.role === 'MANAGER') {
+            const managerRolePermissions = await this.prisma.rolePermission.findMany({
+                where: { role: revokedBy.role },
+                include: { permission: true },
+            });
+            const managerGrantedPermissions = await this.prisma.user.findUnique({
+                where: { id: revokedBy.id },
+                select: { grantedPermissions: true },
+            });
+            const managerPermNames = [
+                ...managerRolePermissions.map((rp) => rp.permission.name),
+                ...(managerGrantedPermissions?.grantedPermissions || []),
+            ];
+            if (!managerPermNames.includes(permissionName)) {
+                throw new common_1.ForbiddenException('You can only revoke permissions you have');
+            }
+        }
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        const currentPerms = user.grantedPermissions || [];
+        if (currentPerms.includes(permissionName)) {
+            await this.prisma.user.update({
+                where: { id: userId },
+                data: {
+                    grantedPermissions: currentPerms.filter((p) => p !== permissionName),
+                },
+            });
+            await this.auditLogService.log({
+                userId: revokedBy.id,
+                userEmail: revokedBy.email,
+                action: client_1.AuditAction.PERMISSION_CHANGE,
+                resource: 'user',
+                resourceId: userId,
+                oldData: { revokedPermission: permissionName },
+            });
+        }
+        return this.prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                grantedPermissions: true,
+            },
+        });
+    }
     canGrantPermission(user, permissionLevel) {
         const userLevel = RoleHierarchy[user.role];
         if (userLevel === 0)

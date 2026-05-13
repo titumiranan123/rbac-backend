@@ -16,8 +16,6 @@ exports.PermissionsController = void 0;
 const common_1 = require("@nestjs/common");
 const permissions_service_1 = require("./permissions.service");
 const permission_dto_1 = require("./dto/permission.dto");
-const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
-const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../auth/decorators/roles.decorator");
 const current_user_decorator_1 = require("../auth/decorators/current-user.decorator");
 const client_1 = require("@prisma/client");
@@ -25,6 +23,17 @@ const zod_validation_pipe_1 = require("../common/pipes/zod-validation.pipe");
 let PermissionsController = class PermissionsController {
     constructor(permissionsService) {
         this.permissionsService = permissionsService;
+    }
+    async getGrantable(user) {
+        console.log('Actor role:', user.role);
+        console.log('Actor id:', user.id);
+        return this.permissionsService.getGrantable(user);
+    }
+    async grant(dto, user) {
+        return this.permissionsService.grant(dto.userId, dto.permissionName, user);
+    }
+    async revoke(dto, user) {
+        return this.permissionsService.revoke(dto.userId, dto.permissionName, user);
     }
     async findAll() {
         return this.permissionsService.findAll();
@@ -43,6 +52,32 @@ let PermissionsController = class PermissionsController {
     }
 };
 exports.PermissionsController = PermissionsController;
+__decorate([
+    (0, common_1.Get)('grantable'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], PermissionsController.prototype, "getGrantable", null);
+__decorate([
+    (0, common_1.Post)('grant'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PermissionsController.prototype, "grant", null);
+__decorate([
+    (0, common_1.Post)('revoke'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], PermissionsController.prototype, "revoke", null);
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
@@ -88,7 +123,6 @@ __decorate([
 ], PermissionsController.prototype, "remove", null);
 exports.PermissionsController = PermissionsController = __decorate([
     (0, common_1.Controller)('permissions'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [permissions_service_1.PermissionsService])
 ], PermissionsController);
 //# sourceMappingURL=permissions.controller.js.map

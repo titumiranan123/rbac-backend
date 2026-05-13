@@ -3,6 +3,39 @@ import { UserProfile, CreatePermissionData, UpdatePermissionData } from '../type
 export declare class PermissionsController {
     private readonly permissionsService;
     constructor(permissionsService: PermissionsService);
+    getGrantable(user: UserProfile): Promise<{
+        id: string;
+        name: string;
+        description: string;
+        resource: string;
+        action: string;
+        level: number;
+        isActive: boolean;
+    }[]>;
+    grant(dto: {
+        userId: string;
+        permissionName: string;
+    }, user: UserProfile): Promise<{
+        id: string;
+        isActive: boolean;
+        role: import(".prisma/client").$Enums.RoleEnum;
+        email: string;
+        firstName: string;
+        lastName: string;
+        grantedPermissions: string[];
+    }>;
+    revoke(dto: {
+        userId: string;
+        permissionName: string;
+    }, user: UserProfile): Promise<{
+        id: string;
+        isActive: boolean;
+        role: import(".prisma/client").$Enums.RoleEnum;
+        email: string;
+        firstName: string;
+        lastName: string;
+        grantedPermissions: string[];
+    }>;
     findAll(): Promise<{
         id: string;
         name: string;

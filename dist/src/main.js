@@ -7,16 +7,10 @@ const core_1 = require("@nestjs/core");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
-const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const app_module_1 = require("./app.module");
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.use((0, cookie_parser_1.default)());
-    app.use((0, express_rate_limit_1.default)({
-        windowMs: 15 * 60 * 1000,
-        max: 100,
-        message: 'Too many requests',
-    }));
     app.setGlobalPrefix('api');
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: false,

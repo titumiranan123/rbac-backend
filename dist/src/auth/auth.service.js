@@ -50,13 +50,13 @@ const bcrypt = __importStar(require("bcryptjs"));
 const prisma_service_1 = require("../prisma/prisma.service");
 const audit_log_service_1 = require("../audit-log/audit-log.service");
 const client_1 = require("@prisma/client");
+const blacklist_1 = require("./blacklist");
 let AuthService = class AuthService {
     constructor(prisma, jwtService, configService, auditLogService) {
         this.prisma = prisma;
         this.jwtService = jwtService;
         this.configService = configService;
         this.auditLogService = auditLogService;
-        this.tokenBlacklist = new Set();
         this.failedAttempts = new Map();
         this.BLOCK_DURATION_MS = 15 * 60 * 1000;
         this.MAX_ATTEMPTS = 5;
@@ -123,7 +123,7 @@ let AuthService = class AuthService {
         return this.generateTokens(user);
     }
     async refreshToken(refreshToken) {
-        if (this.tokenBlacklist.has(refreshToken)) {
+        if (blacklist_1.blacklistedTokens.has(refreshToken)) {
             throw new common_1.UnauthorizedException('Token has been revoked');
         }
         try {
@@ -142,8 +142,11 @@ let AuthService = class AuthService {
             throw new common_1.UnauthorizedException('Invalid refresh token');
         }
     }
-    async logout(user, refreshToken, ipAddress, userAgent) {
-        this.tokenBlacklist.add(refreshToken);
+    async logout(user, refreshToken, accessToken, ipAddress, userAgent) {
+        if (refreshToken)
+            blacklist_1.blacklistedTokens.add(refreshToken);
+        if (accessToken)
+            blacklist_1.blacklistedTokens.add(accessToken);
         await this.auditLogService.log({
             userId: user.id,
             userEmail: user.email,
