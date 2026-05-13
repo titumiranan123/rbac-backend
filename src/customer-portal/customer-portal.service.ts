@@ -25,31 +25,19 @@ interface Order {
 export class CustomerPortalService {
   constructor(private prisma: PrismaService) {}
 
-  async getTickets(userId: string, page = 1, limit = 20): Promise<PaginatedResult<Ticket>> {
+  getTickets(userId: string, page = 1, limit = 20): PaginatedResult<Ticket> {
     const tickets: Ticket[] = [];
-    const total = 0;
     return {
       data: tickets,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: 0,
-      },
+      meta: { total: 0, page, limit, totalPages: 0 },
     };
   }
 
-  async getOrders(userId: string, page = 1, limit = 20): Promise<PaginatedResult<Order>> {
+  getOrders(userId: string, page = 1, limit = 20): PaginatedResult<Order> {
     const orders: Order[] = [];
-    const total = 0;
     return {
       data: orders,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: 0,
-      },
+      meta: { total: 0, page, limit, totalPages: 0 },
     };
   }
 }

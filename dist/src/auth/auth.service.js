@@ -75,16 +75,7 @@ let AuthService = class AuthService {
                 password: hashedPassword,
                 firstName: data.firstName,
                 lastName: data.lastName,
-                role: data.role || 'CUSTOMER',
-                permissions: {
-                    connect: data.role === 'ADMIN'
-                        ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'delete_user' }, { name: 'suspend_user' }, { name: 'ban_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }]
-                        : data.role === 'MANAGER'
-                            ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }]
-                            : data.role === 'AGENT'
-                                ? [{ name: 'view_dashboard' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'view_customer_portal' }]
-                                : [{ name: 'view_dashboard' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }],
-                },
+                role: data.role || client_1.RoleEnum.CUSTOMER,
             },
             include: { permissions: true },
         });
@@ -188,10 +179,20 @@ let AuthService = class AuthService {
     clearFailedAttempts(ip) {
         this.failedAttempts.delete(ip);
     }
-    generateTokens(user) {
-        const grantedPerms = user.grantedPermissions || [];
+    async generateTokens(user) {
+        const rolePermissions = await this.prisma.rolePermission.findMany({
+            where: { role: user.role },
+            include: { permission: true },
+        });
+        const rolePerms = rolePermissions.map((rp) => rp.permission.name);
         const dbPerms = user.permissions?.map((p) => p.name) || [];
-        const allPermissions = [...grantedPerms, ...dbPerms, user.role];
+        const grantedPerms = user.grantedPermissions || [];
+        const allPermissions = [
+            ...rolePerms,
+            ...grantedPerms,
+            ...dbPerms,
+            user.role,
+        ];
         const payload = {
             sub: user.id,
             email: user.email,
@@ -203,11 +204,13 @@ let AuthService = class AuthService {
             secret: this.configService.get('JWT_REFRESH_SECRET'),
             expiresIn: '7d',
         });
-        return { accessToken, refreshToken, user: this.mapUserProfile(user) };
+        return {
+            accessToken,
+            refreshToken,
+            user: this.mapUserProfile(user, rolePerms),
+        };
     }
-    mapUserProfile(user) {
-        const dbPerms = user.permissions?.map((p) => p.name) || [];
-        const grantedPerms = user.grantedPermissions || [];
+    mapUserProfile(user, rolePerms = []) {
         return {
             id: user.id,
             email: user.email,
@@ -218,7 +221,7 @@ let AuthService = class AuthService {
             lastLoginAt: user.lastLoginAt,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
-            grantedPermissions: [...grantedPerms, ...dbPerms],
+            grantedPermissions: [...rolePerms, ...(user.grantedPermissions || [])],
         };
     }
 };

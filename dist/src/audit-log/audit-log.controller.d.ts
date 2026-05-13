@@ -7,15 +7,15 @@ export declare class AuditLogController {
     findByUserId(userId: string, query: AuditLogQuery): Promise<AuditLogResult>;
     findByResource(resource: string, resourceId: string): Promise<{
         id: string;
-        resource: string | null;
+        resource: string;
         action: import(".prisma/client").$Enums.AuditAction;
         userEmail: string;
-        resourceId: string | null;
-        oldData: import("@prisma/client/runtime/client").JsonValue | null;
-        newData: import("@prisma/client/runtime/client").JsonValue | null;
-        ipAddress: string | null;
-        userAgent: string | null;
-        status: string | null;
+        resourceId: string;
+        oldData: import("@prisma/client/runtime/client").JsonValue;
+        newData: import("@prisma/client/runtime/client").JsonValue;
+        ipAddress: string;
+        userAgent: string;
+        status: string;
         timestamp: Date;
         userId: string;
     }[]>;

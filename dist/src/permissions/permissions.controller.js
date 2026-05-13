@@ -26,9 +26,6 @@ let PermissionsController = class PermissionsController {
     constructor(permissionsService) {
         this.permissionsService = permissionsService;
     }
-    async seedPermissions() {
-        return this.permissionsService.seedPermissions();
-    }
     async findAll() {
         return this.permissionsService.findAll();
     }
@@ -46,13 +43,6 @@ let PermissionsController = class PermissionsController {
     }
 };
 exports.PermissionsController = PermissionsController;
-__decorate([
-    (0, common_1.Post)('seed'),
-    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
-    __metadata("design:returntype", Promise)
-], PermissionsController.prototype, "seedPermissions", null);
 __decorate([
     (0, common_1.Get)(),
     (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),

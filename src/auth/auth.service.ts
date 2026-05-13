@@ -9,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditLogService } from '../audit-log/audit-log.service';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, RoleEnum } from '@prisma/client';
 import { RegisterInput, LoginInput } from './dto/auth.dto';
 import {
   TokenPayload,
@@ -38,7 +38,6 @@ export class AuthService {
     private auditLogService: AuditLogService,
   ) {}
 
-  // Hashes password and creates new user with audit log
   async register(
     data: RegisterInput,
     ipAddress?: string,
@@ -56,16 +55,7 @@ export class AuthService {
         password: hashedPassword,
         firstName: data.firstName,
         lastName: data.lastName,
-        role: data.role || 'CUSTOMER',
-        permissions: {
-          connect: data.role === 'ADMIN' 
-            ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'delete_user' }, { name: 'suspend_user' }, { name: 'ban_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }]
-            : data.role === 'MANAGER'
-            ? [{ name: 'view_dashboard' }, { name: 'view_users' }, { name: 'create_user' }, { name: 'edit_user' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'delete_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'delete_task' }, { name: 'view_reports' }, { name: 'view_audit_log' }, { name: 'view_settings' }, { name: 'view_customer_portal' }]
-            : data.role === 'AGENT'
-            ? [{ name: 'view_dashboard' }, { name: 'view_leads' }, { name: 'create_lead' }, { name: 'edit_lead' }, { name: 'view_tasks' }, { name: 'create_task' }, { name: 'edit_task' }, { name: 'view_customer_portal' }]
-            : [{ name: 'view_dashboard' }, { name: 'view_customer_portal' }, { name: 'view_orders' }, { name: 'view_tickets' }],
-        },
+        role: data.role || RoleEnum.CUSTOMER,
       },
       include: { permissions: true },
     });
@@ -78,10 +68,9 @@ export class AuthService {
       ipAddress,
       userAgent,
     });
-    return this.generateTokens(user as UserWithPermissions);
+    return this.generateTokens(user);
   }
 
-  // Verifies password with brute-force protection
   async login(
     data: LoginInput,
     ipAddress?: string,
@@ -119,7 +108,6 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  // Validates refresh token with blacklist check
   async refreshToken(refreshToken: string): Promise<AuthTokens> {
     if (this.tokenBlacklist.has(refreshToken)) {
       throw new UnauthorizedException('Token has been revoked');
@@ -140,7 +128,6 @@ export class AuthService {
     }
   }
 
-  // Logs user out and blacklists refresh token
   async logout(
     user: UserProfile,
     refreshToken: string,
@@ -159,7 +146,6 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
-  // Checks if IP is blocked due to failed attempts
   private isIpBlocked(ip: string): boolean {
     const attempt = this.failedAttempts.get(ip);
     if (!attempt) return false;
@@ -170,7 +156,6 @@ export class AuthService {
     return true;
   }
 
-  // Records failed login attempt
   private recordFailedAttempt(ip: string): void {
     const now = Date.now();
     const attempt = this.failedAttempts.get(ip);
@@ -183,16 +168,24 @@ export class AuthService {
     }
   }
 
-  // Clears failed attempts on successful login
   private clearFailedAttempts(ip: string): void {
     this.failedAttempts.delete(ip);
   }
 
-  // Creates and signs JWT access and refresh tokens
-  private generateTokens(user: UserWithPermissions): AuthTokens {
-    const grantedPerms: string[] = user.grantedPermissions || [];
-    const dbPerms: string[] = user.permissions?.map((p) => p.name) || [];
-    const allPermissions = [...grantedPerms, ...dbPerms, user.role];
+  private async generateTokens(user: UserWithPermissions): Promise<AuthTokens> {
+    const rolePermissions = await this.prisma.rolePermission.findMany({
+      where: { role: user.role },
+      include: { permission: true },
+    });
+    const rolePerms = rolePermissions.map((rp) => rp.permission.name);
+    const dbPerms = user.permissions?.map((p) => p.name) || [];
+    const grantedPerms = user.grantedPermissions || [];
+    const allPermissions = [
+      ...rolePerms,
+      ...grantedPerms,
+      ...dbPerms,
+      user.role,
+    ];
 
     const payload: TokenPayload = {
       sub: user.id,
@@ -200,18 +193,24 @@ export class AuthService {
       role: user.role,
       grantedPermissions: allPermissions,
     };
+
     const accessToken = this.jwtService.sign(payload);
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
-    return { accessToken, refreshToken, user: this.mapUserProfile(user) };
+
+    return {
+      accessToken,
+      refreshToken,
+      user: this.mapUserProfile(user, rolePerms),
+    };
   }
 
-  // Converts user object to UserProfile without sensitive data
-  private mapUserProfile(user: UserWithPermissions): UserProfile {
-    const dbPerms = user.permissions?.map((p) => p.name) || [];
-    const grantedPerms = user.grantedPermissions || [];
+  private mapUserProfile(
+    user: UserWithPermissions,
+    rolePerms: string[] = [],
+  ): UserProfile {
     return {
       id: user.id,
       email: user.email,
@@ -222,7 +221,7 @@ export class AuthService {
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      grantedPermissions: [...grantedPerms, ...dbPerms],
+      grantedPermissions: [...rolePerms, ...(user.grantedPermissions || [])],
     };
   }
 }

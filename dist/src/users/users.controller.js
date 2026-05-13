@@ -59,6 +59,10 @@ let UsersController = class UsersController {
     async revokePermission(id, permission, user) {
         return this.usersService.revokePermission(id, permission, user);
     }
+    async getUserPermissions(id) {
+        const user = await this.usersService.findOne(id);
+        return { grantedPermissions: user.grantedPermissions || [] };
+    }
 };
 exports.UsersController = UsersController;
 __decorate([
@@ -162,6 +166,14 @@ __decorate([
     __metadata("design:paramtypes", [String, String, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "revokePermission", null);
+__decorate([
+    (0, common_1.Get)('permissions/user/:id'),
+    (0, roles_decorator_1.Roles)(client_1.RoleEnum.ADMIN, client_1.RoleEnum.MANAGER),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getUserPermissions", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

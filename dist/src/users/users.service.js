@@ -62,6 +62,7 @@ let UsersService = class UsersService {
     async create(data, createdBy) {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: data.email },
+            select: { id: true },
         });
         if (existingUser)
             throw new common_1.ForbiddenException('User with this email already exists');
@@ -73,6 +74,17 @@ let UsersService = class UsersService {
                 firstName: data.firstName,
                 lastName: data.lastName,
                 role: data.role || client_1.RoleEnum.CUSTOMER,
+            },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
             },
         });
         await this.auditLogService.log({
@@ -88,7 +100,7 @@ let UsersService = class UsersService {
                 role: user.role,
             },
         });
-        return this.sanitizeUser(user);
+        return user;
     }
     async findAll(page = 1, limit = 20, role, isActive) {
         const where = {};
@@ -99,6 +111,18 @@ let UsersService = class UsersService {
         const [users, total] = await Promise.all([
             this.prisma.user.findMany({
                 where,
+                select: {
+                    id: true,
+                    email: true,
+                    firstName: true,
+                    lastName: true,
+                    role: true,
+                    isActive: true,
+                    createdAt: true,
+                    updatedAt: true,
+                    lastLoginAt: true,
+                    grantedPermissions: true,
+                },
                 skip: (Number(page) - 1) * Number(limit),
                 take: Number(limit),
                 orderBy: { createdAt: 'desc' },
@@ -106,7 +130,7 @@ let UsersService = class UsersService {
             this.prisma.user.count({ where }),
         ]);
         return {
-            data: users.map((u) => this.sanitizeUser(u)),
+            data: users,
             meta: {
                 total,
                 page,
@@ -118,26 +142,88 @@ let UsersService = class UsersService {
     async findOne(id) {
         const user = await this.prisma.user.findUnique({
             where: { id },
-            include: { permissions: true },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+                grantedPermissions: true,
+                permissions: { select: { name: true } },
+            },
         });
         if (!user)
             throw new common_1.NotFoundException('User not found');
-        return this.sanitizeUser(user);
+        const dbPermissions = user.permissions.map((p) => p.name);
+        return {
+            id: user.id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: user.role,
+            isActive: user.isActive,
+            lastLoginAt: user.lastLoginAt,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt,
+            grantedPermissions: [
+                ...dbPermissions,
+                ...(user.grantedPermissions || []),
+            ],
+        };
     }
     async findByEmail(email) {
         return this.prisma.user.findUnique({
             where: { email },
-            include: { permissions: true },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+                grantedPermissions: true,
+                permissions: { select: { name: true } },
+            },
         });
     }
     async update(id, updateData, updatedBy) {
-        const user = await this.prisma.user.findUnique({ where: { id } });
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
+        });
         if (!user)
             throw new common_1.NotFoundException('User not found');
-        const oldData = { ...user };
         const updatedUser = await this.prisma.user.update({
             where: { id },
             data: updateData,
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
         await this.auditLogService.log({
             userId: updatedBy.id,
@@ -145,13 +231,16 @@ let UsersService = class UsersService {
             action: client_1.AuditAction.UPDATE,
             resource: 'user',
             resourceId: updatedUser.id,
-            oldData,
+            oldData: user,
             newData: updateData,
         });
-        return this.sanitizeUser(updatedUser);
+        return updatedUser;
     }
     async remove(id, deletedBy) {
-        const user = await this.prisma.user.findUnique({ where: { id } });
+        const user = await this.prisma.user.findUnique({
+            where: { id },
+            select: { id: true, email: true, role: true },
+        });
         if (!user)
             throw new common_1.NotFoundException('User not found');
         if (user.id === deletedBy.id)
@@ -168,11 +257,18 @@ let UsersService = class UsersService {
             resourceId: user.id,
             oldData: { email: user.email, role: user.role },
         });
+        await this.prisma.auditLog.updateMany({
+            where: { userId: id },
+            data: { userId: null },
+        });
         await this.prisma.user.delete({ where: { id } });
         return { message: 'User deleted successfully' };
     }
     async suspend(id, suspendedBy) {
-        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        const targetUser = await this.prisma.user.findUnique({
+            where: { id },
+            select: { id: true, email: true, role: true, isActive: true },
+        });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
         if (targetUser.id === suspendedBy.id)
@@ -184,6 +280,17 @@ let UsersService = class UsersService {
         const updatedUser = await this.prisma.user.update({
             where: { id },
             data: { isActive: false },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
         await this.auditLogService.log({
             userId: suspendedBy.id,
@@ -192,10 +299,13 @@ let UsersService = class UsersService {
             resource: 'user',
             resourceId: id,
         });
-        return this.sanitizeUser(updatedUser);
+        return updatedUser;
     }
     async ban(id, bannedBy) {
-        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        const targetUser = await this.prisma.user.findUnique({
+            where: { id },
+            select: { id: true, email: true, role: true, isActive: true },
+        });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
         if (targetUser.id === bannedBy.id)
@@ -207,6 +317,17 @@ let UsersService = class UsersService {
         const updatedUser = await this.prisma.user.update({
             where: { id },
             data: { isActive: false },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
         await this.auditLogService.log({
             userId: bannedBy.id,
@@ -215,15 +336,29 @@ let UsersService = class UsersService {
             resource: 'user',
             resourceId: id,
         });
-        return this.sanitizeUser(updatedUser);
+        return updatedUser;
     }
     async activate(id, activatedBy) {
-        const targetUser = await this.prisma.user.findUnique({ where: { id } });
+        const targetUser = await this.prisma.user.findUnique({
+            where: { id },
+            select: { id: true },
+        });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
         const updatedUser = await this.prisma.user.update({
             where: { id },
             data: { isActive: true },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
         await this.auditLogService.log({
             userId: activatedBy.id,
@@ -232,11 +367,12 @@ let UsersService = class UsersService {
             resource: 'user',
             resourceId: id,
         });
-        return this.sanitizeUser(updatedUser);
+        return updatedUser;
     }
     async assignRole(userId, newRole, assignedBy) {
         const targetUser = await this.prisma.user.findUnique({
             where: { id: userId },
+            select: { id: true, email: true, role: true },
         });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
@@ -253,6 +389,17 @@ let UsersService = class UsersService {
         const updatedUser = await this.prisma.user.update({
             where: { id: userId },
             data: { role: newRole },
+            select: {
+                id: true,
+                email: true,
+                firstName: true,
+                lastName: true,
+                role: true,
+                isActive: true,
+                lastLoginAt: true,
+                createdAt: true,
+                updatedAt: true,
+            },
         });
         await this.auditLogService.log({
             userId: assignedBy.id,
@@ -263,23 +410,24 @@ let UsersService = class UsersService {
             oldData: { role: oldRole },
             newData: { role: newRole },
         });
-        return this.sanitizeUser(updatedUser);
+        return updatedUser;
     }
     async grantPermission(userId, permission, grantedBy) {
         const targetUser = await this.prisma.user.findUnique({
             where: { id: userId },
+            select: { id: true, grantedPermissions: true },
         });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
-        const grantedByUser = await this.prisma.user.findUnique({
-            where: { id: grantedBy.id },
-            include: { permissions: true },
+        const grantedByPermissions = grantedBy.grantedPermissions || [];
+        const rolePerms = await this.prisma.rolePermission.findMany({
+            where: { role: grantedBy.role },
+            select: { permission: { select: { name: true } } },
         });
-        const grantedByPermissions = grantedByUser?.grantedPermissions || [];
-        const dbPermissions = grantedByUser?.permissions?.map((p) => p.name) || [];
+        const rolePermissionNames = rolePerms.map((rp) => rp.permission.name);
         const allGrantedByPermissions = [
             ...grantedByPermissions,
-            ...dbPermissions,
+            ...rolePermissionNames,
             grantedBy.role,
         ];
         if (!allGrantedByPermissions.includes(permission) &&
@@ -307,18 +455,19 @@ let UsersService = class UsersService {
     async revokePermission(userId, permission, revokedBy) {
         const targetUser = await this.prisma.user.findUnique({
             where: { id: userId },
+            select: { id: true, grantedPermissions: true },
         });
         if (!targetUser)
             throw new common_1.NotFoundException('User not found');
-        const revokedByUser = await this.prisma.user.findUnique({
-            where: { id: revokedBy.id },
-            include: { permissions: true },
+        const revokedByPermissions = revokedBy.grantedPermissions || [];
+        const rolePerms = await this.prisma.rolePermission.findMany({
+            where: { role: revokedBy.role },
+            select: { permission: { select: { name: true } } },
         });
-        const revokedByPermissions = revokedByUser?.grantedPermissions || [];
-        const dbPermissions = revokedByUser?.permissions?.map((p) => p.name) || [];
+        const rolePermissionNames = rolePerms.map((rp) => rp.permission.name);
         const allRevokedByPermissions = [
             ...revokedByPermissions,
-            ...dbPermissions,
+            ...rolePermissionNames,
             revokedBy.role,
         ];
         if (!allRevokedByPermissions.includes(permission) &&
@@ -342,11 +491,6 @@ let UsersService = class UsersService {
             });
         }
         return this.findOne(userId);
-    }
-    sanitizeUser(user) {
-        const { password, ...result } = user;
-        void password;
-        return result;
     }
 };
 exports.UsersService = UsersService;

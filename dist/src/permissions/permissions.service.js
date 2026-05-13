@@ -25,145 +25,32 @@ let PermissionsService = class PermissionsService {
         this.prisma = prisma;
         this.auditLogService = auditLogService;
     }
-    async seedPermissions() {
-        const permissions = [
-            {
-                name: 'users:create',
-                description: 'Create users',
-                resource: 'users',
-                action: 'create',
-                level: 0,
-            },
-            {
-                name: 'users:read',
-                description: 'Read users',
-                resource: 'users',
-                action: 'read',
-                level: 0,
-            },
-            {
-                name: 'users:update',
-                description: 'Update users',
-                resource: 'users',
-                action: 'update',
-                level: 0,
-            },
-            {
-                name: 'users:delete',
-                description: 'Delete users',
-                resource: 'users',
-                action: 'delete',
-                level: 0,
-            },
-            {
-                name: 'roles:create',
-                description: 'Create roles',
-                resource: 'roles',
-                action: 'create',
-                level: 0,
-            },
-            {
-                name: 'roles:read',
-                description: 'Read roles',
-                resource: 'roles',
-                action: 'read',
-                level: 0,
-            },
-            {
-                name: 'roles:update',
-                description: 'Update roles',
-                resource: 'roles',
-                action: 'update',
-                level: 0,
-            },
-            {
-                name: 'roles:delete',
-                description: 'Delete roles',
-                resource: 'roles',
-                action: 'delete',
-                level: 0,
-            },
-            {
-                name: 'permissions:manage',
-                description: 'Manage permissions',
-                resource: 'permissions',
-                action: 'manage',
-                level: 0,
-            },
-            {
-                name: 'audit:read',
-                description: 'Read audit logs',
-                resource: 'audit',
-                action: 'read',
-                level: 1,
-            },
-            {
-                name: 'reports:read',
-                description: 'Read reports',
-                resource: 'reports',
-                action: 'read',
-                level: 1,
-            },
-            {
-                name: 'tickets:create',
-                description: 'Create tickets',
-                resource: 'tickets',
-                action: 'create',
-                level: 2,
-            },
-            {
-                name: 'tickets:read',
-                description: 'Read tickets',
-                resource: 'tickets',
-                action: 'read',
-                level: 2,
-            },
-            {
-                name: 'tickets:update',
-                description: 'Update tickets',
-                resource: 'tickets',
-                action: 'update',
-                level: 2,
-            },
-            {
-                name: 'customers:read',
-                description: 'Read customers',
-                resource: 'customers',
-                action: 'read',
-                level: 2,
-            },
-            {
-                name: 'profile:read',
-                description: 'Read own profile',
-                resource: 'profile',
-                action: 'read',
-                level: 3,
-            },
-            {
-                name: 'profile:update',
-                description: 'Update own profile',
-                resource: 'profile',
-                action: 'update',
-                level: 3,
-            },
-        ];
-        for (const permData of permissions) {
-            const existingPerm = await this.prisma.permission.findUnique({
-                where: { name: permData.name },
-            });
-            if (!existingPerm)
-                await this.prisma.permission.create({ data: permData });
-        }
-        return { message: 'Permissions seeded successfully' };
-    }
     async findAll() {
         return this.prisma.permission.findMany({
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                resource: true,
+                action: true,
+                level: true,
+                isActive: true,
+            },
             orderBy: [{ resource: 'asc' }, { action: 'asc' }],
         });
     }
     async findOne(id) {
         const permission = await this.prisma.permission.findUnique({
             where: { id },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                resource: true,
+                action: true,
+                level: true,
+                isActive: true,
+            },
         });
         if (!permission)
             throw new common_1.NotFoundException('Permission not found');
@@ -175,7 +62,18 @@ let PermissionsService = class PermissionsService {
             throw new common_1.ForbiddenException('Only Admin can create permissions');
         if (data.level < userLevel)
             throw new common_1.ForbiddenException('Cannot create permission with level higher than your role');
-        const permission = await this.prisma.permission.create({ data });
+        const permission = await this.prisma.permission.create({
+            data,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                resource: true,
+                action: true,
+                level: true,
+                isActive: true,
+            },
+        });
         await this.auditLogService.log({
             userId: createdBy.id,
             userEmail: createdBy.email,
@@ -189,6 +87,15 @@ let PermissionsService = class PermissionsService {
     async update(id, updateData, updatedBy) {
         const permission = await this.prisma.permission.findUnique({
             where: { id },
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                resource: true,
+                action: true,
+                level: true,
+                isActive: true,
+            },
         });
         if (!permission)
             throw new common_1.NotFoundException('Permission not found');
@@ -197,10 +104,18 @@ let PermissionsService = class PermissionsService {
             throw new common_1.ForbiddenException('Only Admin can update permissions');
         if (updateData.level !== undefined && updateData.level < userLevel)
             throw new common_1.ForbiddenException('Cannot set permission level higher than your role');
-        const oldData = { ...permission };
         const updatedPermission = await this.prisma.permission.update({
             where: { id },
             data: updateData,
+            select: {
+                id: true,
+                name: true,
+                description: true,
+                resource: true,
+                action: true,
+                level: true,
+                isActive: true,
+            },
         });
         await this.auditLogService.log({
             userId: updatedBy.id,
@@ -208,7 +123,7 @@ let PermissionsService = class PermissionsService {
             action: client_1.AuditAction.UPDATE,
             resource: 'permission',
             resourceId: updatedPermission.id,
-            oldData,
+            oldData: permission,
             newData: updateData,
         });
         return updatedPermission;
@@ -216,6 +131,7 @@ let PermissionsService = class PermissionsService {
     async remove(id, deletedBy) {
         const permission = await this.prisma.permission.findUnique({
             where: { id },
+            select: { id: true, name: true },
         });
         if (!permission)
             throw new common_1.NotFoundException('Permission not found');

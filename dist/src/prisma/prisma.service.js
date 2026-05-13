@@ -17,9 +17,15 @@ const pg_1 = require("pg");
 require("dotenv/config");
 let PrismaService = class PrismaService extends client_1.PrismaClient {
     constructor() {
+        console.log('Initializing PrismaService with DATABASE_URL:', process.env.DATABASE_URL);
         const connectionString = process.env.DATABASE_URL ||
-            'postgresql://admin:admin123@localhost:5433/rbac_db?schema=public';
-        const pool = new pg_1.Pool({ connectionString });
+            'postgresql://admin:admin123@localhost:5433/rbac_db?schema=public&connection_limit=10&pool_timeout=20';
+        const pool = new pg_1.Pool({
+            connectionString,
+            ssl: {
+                rejectUnauthorized: false,
+            },
+        });
         const adapter = new adapter_pg_1.PrismaPg(pool);
         super({ adapter });
     }

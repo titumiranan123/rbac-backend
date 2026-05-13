@@ -24,4 +24,7 @@ export declare class UsersController {
     }, user: UserProfile): Promise<UserProfile>;
     grantPermission(id: string, permission: string, user: UserProfile): Promise<UserProfile>;
     revokePermission(id: string, permission: string, user: UserProfile): Promise<UserProfile>;
+    getUserPermissions(id: string): Promise<{
+        grantedPermissions: string[];
+    }>;
 }

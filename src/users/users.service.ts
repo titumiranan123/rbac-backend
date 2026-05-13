@@ -34,6 +34,7 @@ export class UsersService {
   ): Promise<UserProfile> {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: data.email },
+      select: { id: true },
     });
     if (existingUser)
       throw new ForbiddenException('User with this email already exists');
@@ -45,6 +46,17 @@ export class UsersService {
         firstName: data.firstName,
         lastName: data.lastName,
         role: data.role || RoleEnum.CUSTOMER,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
       },
     });
     await this.auditLogService.log({
@@ -60,7 +72,7 @@ export class UsersService {
         role: user.role,
       },
     });
-    return this.sanitizeUser(user);
+    return user;
   }
 
   async findAll(
@@ -75,6 +87,18 @@ export class UsersService {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLoginAt: true,
+          grantedPermissions: true,
+        },
         skip: (Number(page) - 1) * Number(limit),
         take: Number(limit),
         orderBy: { createdAt: 'desc' },
@@ -82,7 +106,7 @@ export class UsersService {
       this.prisma.user.count({ where }),
     ]);
     return {
-      data: users.map((u) => this.sanitizeUser(u)),
+      data: users,
       meta: {
         total,
         page,
@@ -95,16 +119,55 @@ export class UsersService {
   async findOne(id: string): Promise<UserProfile> {
     const user = await this.prisma.user.findUnique({
       where: { id },
-      include: { permissions: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        grantedPermissions: true,
+        permissions: { select: { name: true } },
+      },
     });
     if (!user) throw new NotFoundException('User not found');
-    return this.sanitizeUser(user);
+    const dbPermissions = user.permissions.map((p) => p.name);
+    return {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isActive: user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      grantedPermissions: [
+        ...dbPermissions,
+        ...(user.grantedPermissions || []),
+      ],
+    };
   }
 
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({
       where: { email },
-      include: { permissions: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+        grantedPermissions: true,
+        permissions: { select: { name: true } },
+      },
     });
   }
 
@@ -113,12 +176,35 @@ export class UsersService {
     updateData: UpdateUserData,
     updatedBy: UserProfile,
   ): Promise<UserProfile> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
     if (!user) throw new NotFoundException('User not found');
-    const oldData = { ...user };
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: updateData,
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     await this.auditLogService.log({
       userId: updatedBy.id,
@@ -126,14 +212,17 @@ export class UsersService {
       action: AuditAction.UPDATE,
       resource: 'user',
       resourceId: updatedUser.id,
-      oldData,
+      oldData: user,
       newData: updateData,
     });
-    return this.sanitizeUser(updatedUser);
+    return updatedUser;
   }
 
   async remove(id: string, deletedBy: UserProfile) {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true },
+    });
     if (!user) throw new NotFoundException('User not found');
     if (user.id === deletedBy.id)
       throw new ForbiddenException('Cannot delete yourself');
@@ -151,12 +240,19 @@ export class UsersService {
       resourceId: user.id,
       oldData: { email: user.email, role: user.role },
     });
+    await this.prisma.auditLog.updateMany({
+      where: { userId: id },
+      data: { userId: null },
+    });
     await this.prisma.user.delete({ where: { id } });
     return { message: 'User deleted successfully' };
   }
 
   async suspend(id: string, suspendedBy: UserProfile): Promise<UserProfile> {
-    const targetUser = await this.prisma.user.findUnique({ where: { id } });
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
     if (!targetUser) throw new NotFoundException('User not found');
     if (targetUser.id === suspendedBy.id)
       throw new ForbiddenException('Cannot suspend yourself');
@@ -169,6 +265,17 @@ export class UsersService {
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     await this.auditLogService.log({
       userId: suspendedBy.id,
@@ -177,11 +284,14 @@ export class UsersService {
       resource: 'user',
       resourceId: id,
     });
-    return this.sanitizeUser(updatedUser);
+    return updatedUser;
   }
 
   async ban(id: string, bannedBy: UserProfile): Promise<UserProfile> {
-    const targetUser = await this.prisma.user.findUnique({ where: { id } });
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true, email: true, role: true, isActive: true },
+    });
     if (!targetUser) throw new NotFoundException('User not found');
     if (targetUser.id === bannedBy.id)
       throw new ForbiddenException('Cannot ban yourself');
@@ -194,6 +304,17 @@ export class UsersService {
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: { isActive: false },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     await this.auditLogService.log({
       userId: bannedBy.id,
@@ -202,15 +323,29 @@ export class UsersService {
       resource: 'user',
       resourceId: id,
     });
-    return this.sanitizeUser(updatedUser);
+    return updatedUser;
   }
 
   async activate(id: string, activatedBy: UserProfile): Promise<UserProfile> {
-    const targetUser = await this.prisma.user.findUnique({ where: { id } });
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
     if (!targetUser) throw new NotFoundException('User not found');
     const updatedUser = await this.prisma.user.update({
       where: { id },
       data: { isActive: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     await this.auditLogService.log({
       userId: activatedBy.id,
@@ -219,7 +354,7 @@ export class UsersService {
       resource: 'user',
       resourceId: id,
     });
-    return this.sanitizeUser(updatedUser);
+    return updatedUser;
   }
 
   async assignRole(
@@ -229,6 +364,7 @@ export class UsersService {
   ): Promise<UserProfile> {
     const targetUser = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, email: true, role: true },
     });
     if (!targetUser) throw new NotFoundException('User not found');
     const assignedByLevel = RoleHierarchy[assignedBy.role];
@@ -248,6 +384,17 @@ export class UsersService {
     const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { role: newRole },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+        lastLoginAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
     await this.auditLogService.log({
       userId: assignedBy.id,
@@ -258,7 +405,7 @@ export class UsersService {
       oldData: { role: oldRole },
       newData: { role: newRole },
     });
-    return this.sanitizeUser(updatedUser);
+    return updatedUser;
   }
 
   async grantPermission(
@@ -268,17 +415,18 @@ export class UsersService {
   ): Promise<UserProfile> {
     const targetUser = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, grantedPermissions: true },
     });
     if (!targetUser) throw new NotFoundException('User not found');
-    const grantedByUser = await this.prisma.user.findUnique({
-      where: { id: grantedBy.id },
-      include: { permissions: true },
+    const grantedByPermissions = grantedBy.grantedPermissions || [];
+    const rolePerms = await this.prisma.rolePermission.findMany({
+      where: { role: grantedBy.role },
+      select: { permission: { select: { name: true } } },
     });
-    const grantedByPermissions = grantedByUser?.grantedPermissions || [];
-    const dbPermissions = grantedByUser?.permissions?.map((p) => p.name) || [];
+    const rolePermissionNames = rolePerms.map((rp) => rp.permission.name);
     const allGrantedByPermissions = [
       ...grantedByPermissions,
-      ...dbPermissions,
+      ...rolePermissionNames,
       grantedBy.role,
     ];
     if (
@@ -315,17 +463,18 @@ export class UsersService {
   ): Promise<UserProfile> {
     const targetUser = await this.prisma.user.findUnique({
       where: { id: userId },
+      select: { id: true, grantedPermissions: true },
     });
     if (!targetUser) throw new NotFoundException('User not found');
-    const revokedByUser = await this.prisma.user.findUnique({
-      where: { id: revokedBy.id },
-      include: { permissions: true },
+    const revokedByPermissions = revokedBy.grantedPermissions || [];
+    const rolePerms = await this.prisma.rolePermission.findMany({
+      where: { role: revokedBy.role },
+      select: { permission: { select: { name: true } } },
     });
-    const revokedByPermissions = revokedByUser?.grantedPermissions || [];
-    const dbPermissions = revokedByUser?.permissions?.map((p) => p.name) || [];
+    const rolePermissionNames = rolePerms.map((rp) => rp.permission.name);
     const allRevokedByPermissions = [
       ...revokedByPermissions,
-      ...dbPermissions,
+      ...rolePermissionNames,
       revokedBy.role,
     ];
     if (
@@ -355,23 +504,5 @@ export class UsersService {
       });
     }
     return this.findOne(userId);
-  }
-
-  private sanitizeUser(user: {
-    password?: string;
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    role: RoleEnum;
-    isActive: boolean;
-    lastLoginAt: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
-    grantedPermissions?: string[];
-  }): UserProfile {
-    const { password, ...result } = user;
-    void password;
-    return result;
   }
 }

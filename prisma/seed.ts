@@ -37,6 +37,29 @@ const PERMISSIONS = [
   { name: 'view_tickets', description: 'View Tickets', resource: 'tickets', action: 'view', level: 3 },
 ];
 
+const ROLE_PERMISSIONS: Record<RoleEnum, string[]> = {
+  ADMIN: [
+    'view_dashboard', 'view_users', 'create_user', 'edit_user', 'delete_user',
+    'suspend_user', 'ban_user', 'view_leads', 'create_lead', 'edit_lead',
+    'delete_lead', 'view_tasks', 'create_task', 'edit_task', 'delete_task',
+    'view_reports', 'view_audit_log', 'view_settings', 'view_customer_portal',
+    'view_orders', 'view_tickets',
+  ],
+  MANAGER: [
+    'view_dashboard', 'view_users', 'create_user', 'edit_user', 'view_leads',
+    'create_lead', 'edit_lead', 'delete_lead', 'view_tasks', 'create_task',
+    'edit_task', 'delete_task', 'view_reports', 'view_audit_log', 'view_settings',
+    'view_customer_portal',
+  ],
+  AGENT: [
+    'view_dashboard', 'view_leads', 'create_lead', 'edit_lead', 'view_tasks',
+    'create_task', 'edit_task', 'view_customer_portal',
+  ],
+  CUSTOMER: [
+    'view_dashboard', 'view_customer_portal', 'view_orders', 'view_tickets',
+  ],
+};
+
 const ROLES = [
   { name: RoleEnum.ADMIN, description: 'Full system access', level: 0 },
   { name: RoleEnum.MANAGER, description: 'Manage users and view reports', level: 1 },
@@ -78,6 +101,21 @@ async function main() {
   }
   console.log(`Created ${ROLES.length} roles`);
 
+  console.log('Assigning permissions to roles...');
+  for (const [role, perms] of Object.entries(ROLE_PERMISSIONS)) {
+    for (const permName of perms) {
+      const permission = await prisma.permission.findUnique({ where: { name: permName } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { role_permissionId: { role: role as RoleEnum, permissionId: permission.id } },
+          update: {},
+          create: { role: role as RoleEnum, permissionId: permission.id },
+        });
+      }
+    }
+    console.log(`Assigned ${perms.length} permissions to ${role}`);
+  }
+
   console.log('Creating users...');
   for (const user of USERS) {
     const hashedPwd = await bcrypt.hash(user.password, 10);
@@ -89,76 +127,8 @@ async function main() {
   }
   console.log(`Created ${USERS.length} users`);
 
-  console.log('Assigning permissions to roles...');
-  
-  await prisma.role.update({
-    where: { name: RoleEnum.ADMIN },
-    data: { permissions: PERMISSIONS.map((p) => p.name) },
-  });
-
-  const managerPermissions = PERMISSIONS.filter((p) => p.level >= 1).map((p) => p.name);
-  await prisma.role.update({
-    where: { name: RoleEnum.MANAGER },
-    data: { permissions: managerPermissions },
-  });
-
-  const agentPermissions = PERMISSIONS.filter((p) => p.level >= 2).map((p) => p.name);
-  await prisma.role.update({
-    where: { name: RoleEnum.AGENT },
-    data: { permissions: agentPermissions },
-  });
-
-  const customerPermissions = PERMISSIONS.filter((p) => p.level >= 3).map((p) => p.name);
-  await prisma.role.update({
-    where: { name: RoleEnum.CUSTOMER },
-    data: { permissions: customerPermissions },
-  });
-
-  console.log('Assigned permissions to roles');
-
-  // Assign permissions to users directly based on role
-  console.log('Assigning permissions to users...');
-  
+  console.log('Creating audit log entries...');
   const adminUser = await prisma.user.findUnique({ where: { email: 'admin@system.com' } });
-  if (adminUser) {
-    await prisma.user.update({
-      where: { id: adminUser.id },
-      data: { permissions: { connect: PERMISSIONS.map((p) => ({ name: p.name })) } },
-    });
-    console.log('Admin assigned all permissions');
-  }
-
-  const managerUser = await prisma.user.findUnique({ where: { email: 'john.manager@company.com' } });
-  if (managerUser) {
-    const managerPerms = PERMISSIONS.filter((p) => p.level >= 1).map((p) => p.name);
-    await prisma.user.update({
-      where: { id: managerUser.id },
-      data: { permissions: { connect: managerPerms.map((name) => ({ name })) } },
-    });
-    console.log('Manager assigned permissions');
-  }
-
-  const agentUser = await prisma.user.findUnique({ where: { email: 'mike.agent@company.com' } });
-  if (agentUser) {
-    const agentPerms = PERMISSIONS.filter((p) => p.level >= 2).map((p) => p.name);
-    await prisma.user.update({
-      where: { id: agentUser.id },
-      data: { permissions: { connect: agentPerms.map((name) => ({ name })) } },
-    });
-    console.log('Agent assigned permissions');
-  }
-
-  const customerUser = await prisma.user.findUnique({ where: { email: 'alice.customer@client.com' } });
-  if (customerUser) {
-    const customerPerms = PERMISSIONS.filter((p) => p.level >= 3).map((p) => p.name);
-    await prisma.user.update({
-      where: { id: customerUser.id },
-      data: { permissions: { connect: customerPerms.map((name) => ({ name })) } },
-    });
-    console.log('Customer assigned permissions');
-  }
-
-  console.log('Created audit log entries...');
   if (adminUser) {
     await prisma.auditLog.createMany({
       data: [
@@ -166,11 +136,11 @@ async function main() {
         { userId: adminUser.id, userEmail: adminUser.email, action: 'CREATE', resource: 'users', status: 'success' },
         { userId: adminUser.id, userEmail: adminUser.email, action: 'PERMISSION_CHANGE', resource: 'roles', status: 'success' },
       ],
+      skipDuplicates: true,
     });
   }
 
   console.log('Database seed completed!');
-  console.log('\nPermissions assigned to users directly');
   console.log('\nCredentials:');
   console.log('Admin: admin@system.com / Admin@123');
   console.log('Manager: john.manager@company.com / Manager@123');

@@ -41,6 +41,20 @@ let AuditLogService = class AuditLogService {
         const [logs, total] = await Promise.all([
             this.prisma.auditLog.findMany({
                 where,
+                select: {
+                    id: true,
+                    userId: true,
+                    userEmail: true,
+                    action: true,
+                    resource: true,
+                    resourceId: true,
+                    oldData: true,
+                    newData: true,
+                    ipAddress: true,
+                    userAgent: true,
+                    status: true,
+                    timestamp: true,
+                },
                 skip: (Number(page) - 1) * Number(limit),
                 take: Number(limit),
                 orderBy: { timestamp: 'desc' },
@@ -63,6 +77,20 @@ let AuditLogService = class AuditLogService {
     async findByResource(resource, resourceId) {
         return this.prisma.auditLog.findMany({
             where: { resource, resourceId },
+            select: {
+                id: true,
+                userId: true,
+                userEmail: true,
+                action: true,
+                resource: true,
+                resourceId: true,
+                oldData: true,
+                newData: true,
+                ipAddress: true,
+                userAgent: true,
+                status: true,
+                timestamp: true,
+            },
             orderBy: { timestamp: 'desc' },
         });
     }

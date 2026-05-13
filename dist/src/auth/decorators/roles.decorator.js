@@ -7,18 +7,18 @@ exports.ROLES_EXACT_KEY = 'rolesExact';
 const Roles = (...roles) => (0, common_1.SetMetadata)(exports.ROLES_KEY, roles);
 exports.Roles = Roles;
 const RolesExact = (...roles) => {
-    return (target, key, descriptor) => {
+    const decorator = (target, key, descriptor) => {
         if (descriptor) {
-            (0, common_1.SetMetadata)(exports.ROLES_KEY, roles)(target, key, descriptor);
-            (0, common_1.SetMetadata)(exports.ROLES_EXACT_KEY, true)(target, key, descriptor);
-            return descriptor;
+            Reflect.defineMetadata(exports.ROLES_KEY, roles, descriptor.value);
+            Reflect.defineMetadata(exports.ROLES_EXACT_KEY, true, descriptor.value);
         }
         else {
-            (0, common_1.SetMetadata)(exports.ROLES_KEY, roles)(target);
-            (0, common_1.SetMetadata)(exports.ROLES_EXACT_KEY, true)(target);
-            return target;
+            Reflect.defineMetadata(exports.ROLES_KEY, roles, target);
+            Reflect.defineMetadata(exports.ROLES_EXACT_KEY, true, target);
         }
+        return descriptor;
     };
+    return decorator;
 };
 exports.RolesExact = RolesExact;
 //# sourceMappingURL=roles.decorator.js.map

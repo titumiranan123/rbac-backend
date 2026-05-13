@@ -42,16 +42,25 @@ model Permission {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  users User[]
+  users           User[]
+  rolePermissions RolePermission[]
 
   @@map("permissions")
+}
+
+model RolePermission {
+  role          RoleEnum
+  permissionId  String
+  permission    Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([role, permissionId])
+  @@map("role_permissions")
 }
 
 model Role {
   id          String   @id @default(uuid())
   name        RoleEnum @unique
   description String
-  permissions String[]
   level       Int      @default(0)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -81,7 +90,7 @@ model User {
 
 model AuditLog {
   id         String      @id @default(uuid())
-  userId     String
+  userId     String?
   userEmail  String
   action     AuditAction
   resource   String?
@@ -93,7 +102,7 @@ model AuditLog {
   status     String?
   timestamp  DateTime    @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([action])

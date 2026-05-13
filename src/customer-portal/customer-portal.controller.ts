@@ -33,10 +33,10 @@ export class CustomerPortalController {
 
   @Get('tickets')
   @RolesExact(RoleEnum.CUSTOMER)
-  async getTickets(
+  getTickets(
     @CurrentUser() user: UserProfile,
     @Query() query: { page?: number; limit?: number },
-  ): Promise<PaginatedResult<Ticket>> {
+  ): PaginatedResult<Ticket> {
     return this.customerPortalService.getTickets(
       user.id,
       query.page ?? 1,
@@ -46,10 +46,10 @@ export class CustomerPortalController {
 
   @Get('orders')
   @RolesExact(RoleEnum.CUSTOMER)
-  async getOrders(
+  getOrders(
     @CurrentUser() user: UserProfile,
     @Query() query: { page?: number; limit?: number },
-  ): Promise<PaginatedResult<Order>> {
+  ): PaginatedResult<Order> {
     return this.customerPortalService.getOrders(
       user.id,
       query.page ?? 1,

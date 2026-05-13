@@ -19,7 +19,9 @@ import { CustomerPortalModule } from './customer-portal/customer-portal.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.get('JWT_SECRET'),
-        signOptions: { expiresIn: configService.get('JWT_EXPIRES_IN') || '15m' },
+        signOptions: {
+          expiresIn: configService.get('JWT_EXPIRES_IN') || '15m',
+        },
       }),
     }),
     PrismaModule,

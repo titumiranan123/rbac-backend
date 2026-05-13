@@ -24,7 +24,10 @@ let RolesGuard = class RolesGuard {
     }
     canActivate(context) {
         const requiredRoles = this.reflector.getAllAndOverride('roles', [context.getHandler(), context.getClass()]);
-        const exactMatch = this.reflector.getAllAndOverride('rolesExact', [context.getHandler(), context.getClass()]);
+        const exactMatch = this.reflector.getAllAndOverride('rolesExact', [
+            context.getHandler(),
+            context.getClass(),
+        ]);
         if (!requiredRoles)
             return true;
         const request = context.switchToHttp().getRequest();

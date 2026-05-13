@@ -30,13 +30,6 @@ import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 export class PermissionsController {
   constructor(private readonly permissionsService: PermissionsService) {}
 
-  // Seeds default permissions into database
-  @Post('seed')
-  @Roles(RoleEnum.ADMIN)
-  async seedPermissions() {
-    return this.permissionsService.seedPermissions();
-  }
-
   // Returns all permissions ordered by resource and action
   @Get()
   @Roles(RoleEnum.ADMIN, RoleEnum.MANAGER)

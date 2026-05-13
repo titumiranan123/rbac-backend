@@ -5,9 +5,6 @@ export declare class PermissionsService {
     private prisma;
     private auditLogService;
     constructor(prisma: PrismaService, auditLogService: AuditLogService);
-    seedPermissions(): Promise<{
-        message: string;
-    }>;
     findAll(): Promise<{
         id: string;
         name: string;
@@ -16,8 +13,6 @@ export declare class PermissionsService {
         action: string;
         level: number;
         isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
     }[]>;
     findOne(id: string): Promise<{
         id: string;
@@ -27,8 +22,6 @@ export declare class PermissionsService {
         action: string;
         level: number;
         isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     create(data: CreatePermissionData, createdBy: UserProfile): Promise<{
         id: string;
@@ -38,8 +31,6 @@ export declare class PermissionsService {
         action: string;
         level: number;
         isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     update(id: string, updateData: UpdatePermissionData, updatedBy: UserProfile): Promise<{
         id: string;
@@ -49,8 +40,6 @@ export declare class PermissionsService {
         action: string;
         level: number;
         isActive: boolean;
-        createdAt: Date;
-        updatedAt: Date;
     }>;
     remove(id: string, deletedBy: UserProfile): Promise<{
         message: string;

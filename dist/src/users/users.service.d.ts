@@ -10,29 +10,19 @@ export declare class UsersService {
     findAll(page?: number, limit?: number, role?: RoleEnum, isActive?: boolean): Promise<PaginatedResult<UserProfile>>;
     findOne(id: string): Promise<UserProfile>;
     findByEmail(email: string): Promise<{
-        permissions: {
-            id: string;
-            name: string;
-            description: string;
-            resource: string;
-            action: string;
-            level: number;
-            isActive: boolean;
-            createdAt: Date;
-            updatedAt: Date;
-        }[];
-    } & {
         id: string;
         isActive: boolean;
         createdAt: Date;
         updatedAt: Date;
         role: import(".prisma/client").$Enums.RoleEnum;
         email: string;
-        password: string;
         firstName: string;
         lastName: string;
-        lastLoginAt: Date | null;
+        lastLoginAt: Date;
         grantedPermissions: string[];
+        permissions: {
+            name: string;
+        }[];
     }>;
     update(id: string, updateData: UpdateUserData, updatedBy: UserProfile): Promise<UserProfile>;
     remove(id: string, deletedBy: UserProfile): Promise<{
@@ -44,5 +34,4 @@ export declare class UsersService {
     assignRole(userId: string, newRole: RoleEnum, assignedBy: UserProfile): Promise<UserProfile>;
     grantPermission(userId: string, permission: string, grantedBy: UserProfile): Promise<UserProfile>;
     revokePermission(userId: string, permission: string, revokedBy: UserProfile): Promise<UserProfile>;
-    private sanitizeUser;
 }
