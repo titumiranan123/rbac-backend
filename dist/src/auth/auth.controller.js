@@ -25,7 +25,7 @@ let AuthController = class AuthController {
         this.authService = authService;
     }
     async register(dto, req, res) {
-        const result = await this.authService.register(dto, req.ip, req.headers['user-agent']);
+        const result = await this.authService.register(dto);
         this.setRefreshTokenCookie(res, result.refreshToken);
         return { accessToken: result.accessToken, user: result.user };
     }

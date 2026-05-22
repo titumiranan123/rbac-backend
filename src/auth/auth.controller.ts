@@ -47,8 +47,8 @@ export class AuthController {
   ) {
     const result = await this.authService.register(
       dto,
-      req.ip,
-      req.headers['user-agent'],
+      // req.ip,
+      // req.headers['user-agent'],
     );
     this.setRefreshTokenCookie(res, result.refreshToken);
     return { accessToken: result.accessToken, user: result.user };

@@ -10,11 +10,11 @@ export declare class AuthService {
     private configService;
     private auditLogService;
     private failedAttempts;
-    private readonly BLOCK_DURATION_MS;
     private readonly MAX_ATTEMPTS;
     private readonly ATTEMPT_WINDOW_MS;
+    private readonly BLOCK_DURATION_MS;
     constructor(prisma: PrismaService, jwtService: JwtService, configService: ConfigService, auditLogService: AuditLogService);
-    register(data: RegisterInput, ipAddress?: string, userAgent?: string): Promise<AuthTokens>;
+    register(data: RegisterInput): Promise<AuthTokens>;
     login(data: LoginInput, ipAddress?: string, userAgent?: string): Promise<AuthTokens>;
     refreshToken(refreshToken: string): Promise<AuthTokens>;
     logout(user: UserProfile, refreshToken: string, accessToken: string, ipAddress?: string, userAgent?: string): Promise<{

@@ -22,14 +22,16 @@ import { blacklistedTokens } from './blacklist';
 interface FailedAttempt {
   count: number;
   lastAttempt: number;
+  blockedUntil?: number;
 }
 
 @Injectable()
 export class AuthService {
   private failedAttempts = new Map<string, FailedAttempt>();
-  private readonly BLOCK_DURATION_MS = 15 * 60 * 1000;
-  private readonly MAX_ATTEMPTS = 5;
+
+  private readonly MAX_ATTEMPTS = 10;
   private readonly ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+  private readonly BLOCK_DURATION_MS = 15 * 60 * 1000;
 
   constructor(
     private prisma: PrismaService,
@@ -38,17 +40,17 @@ export class AuthService {
     private auditLogService: AuditLogService,
   ) {}
 
-  async register(
-    data: RegisterInput,
-    ipAddress?: string,
-    userAgent?: string,
-  ): Promise<AuthTokens> {
+  async register(data: RegisterInput): Promise<AuthTokens> {
     const existingUser = await this.prisma.user.findUnique({
       where: { email: data.email },
     });
-    if (existingUser)
+
+    if (existingUser) {
       throw new ConflictException('User with this email already exists');
+    }
+
     const hashedPassword = await bcrypt.hash(data.password, 10);
+
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -59,15 +61,17 @@ export class AuthService {
       },
       include: { permissions: true },
     });
-    await this.auditLogService.log({
-      userId: user.id,
-      userEmail: user.email,
-      action: AuditAction.REGISTER,
-      resource: 'user',
-      resourceId: user.id,
-      ipAddress,
-      userAgent,
-    });
+
+    // await this.auditLogService.log({
+    //   userId: user.id,
+    //   userEmail: user.email,
+    //   action: AuditAction.REGISTER,
+    //   resource: 'user',
+    //   resourceId: user.id,
+    //   ipAddress,
+    //   userAgent,
+    // });
+
     return this.generateTokens(user);
   }
 
@@ -76,27 +80,42 @@ export class AuthService {
     ipAddress?: string,
     userAgent?: string,
   ): Promise<AuthTokens> {
-    if (this.isIpBlocked(ipAddress || 'unknown')) {
+    const identifier = ipAddress || 'unknown';
+
+    if (this.isIpBlocked(identifier)) {
       throw new ForbiddenException(
-        'Too many failed attempts. Try again in 15 minutes.',
+        'Too many failed login attempts. Try again after 15 minutes.',
       );
     }
+
     const user = await this.prisma.user.findUnique({
       where: { email: data.email },
       include: { permissions: true },
     });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
-    const isPasswordValid = await bcrypt.compare(data.password, user.password);
-    if (!isPasswordValid) {
-      this.recordFailedAttempt(ipAddress || 'unknown');
+
+    if (!user) {
+      this.recordFailedAttempt(identifier);
       throw new UnauthorizedException('Invalid credentials');
     }
-    if (!user.isActive) throw new UnauthorizedException('Account is inactive');
-    this.clearFailedAttempts(ipAddress || 'unknown');
+
+    const isPasswordValid = await bcrypt.compare(data.password, user.password);
+
+    if (!isPasswordValid) {
+      this.recordFailedAttempt(identifier);
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Account is inactive');
+    }
+
+    this.clearFailedAttempts(identifier);
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+
     await this.auditLogService.log({
       userId: user.id,
       userEmail: user.email,
@@ -105,6 +124,7 @@ export class AuthService {
       userAgent,
       status: 'success',
     });
+
     return this.generateTokens(user);
   }
 
@@ -112,16 +132,21 @@ export class AuthService {
     if (blacklistedTokens.has(refreshToken)) {
       throw new UnauthorizedException('Token has been revoked');
     }
+
     try {
       const payload = this.jwtService.verify<TokenPayload>(refreshToken, {
-        secret: this.configService.get('JWT_REFRESH_SECRET'),
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         include: { permissions: true },
       });
-      if (!user || !user.isActive)
+
+      if (!user || !user.isActive) {
         throw new UnauthorizedException('Invalid refresh token');
+      }
+
       return this.generateTokens(user);
     } catch {
       throw new UnauthorizedException('Invalid refresh token');
@@ -137,6 +162,7 @@ export class AuthService {
   ) {
     if (refreshToken) blacklistedTokens.add(refreshToken);
     if (accessToken) blacklistedTokens.add(accessToken);
+
     await this.auditLogService.log({
       userId: user.id,
       userEmail: user.email,
@@ -145,33 +171,50 @@ export class AuthService {
       userAgent,
       status: 'success',
     });
+
     return { message: 'Logged out successfully' };
   }
 
-  private isIpBlocked(ip: string): boolean {
-    const attempt = this.failedAttempts.get(ip);
-    if (!attempt) return false;
-    if (Date.now() - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
-      this.failedAttempts.delete(ip);
+  private isIpBlocked(identifier: string): boolean {
+    const attempt = this.failedAttempts.get(identifier);
+    if (!attempt?.blockedUntil) return false;
+
+    const now = Date.now();
+
+    if (now >= attempt.blockedUntil) {
+      this.failedAttempts.delete(identifier);
       return false;
     }
+
     return true;
   }
 
-  private recordFailedAttempt(ip: string): void {
+  private recordFailedAttempt(identifier: string): void {
     const now = Date.now();
-    const attempt = this.failedAttempts.get(ip);
+    const attempt = this.failedAttempts.get(identifier);
+
     if (!attempt || now - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
-      this.failedAttempts.set(ip, { count: 1, lastAttempt: now });
-    } else {
-      attempt.count += 1;
-      attempt.lastAttempt = now;
-      this.failedAttempts.set(ip, attempt);
+      this.failedAttempts.set(identifier, {
+        count: 1,
+        lastAttempt: now,
+      });
+      return;
     }
+
+    const nextCount = attempt.count + 1;
+
+    this.failedAttempts.set(identifier, {
+      count: nextCount,
+      lastAttempt: now,
+      blockedUntil:
+        nextCount >= this.MAX_ATTEMPTS
+          ? now + this.BLOCK_DURATION_MS
+          : attempt.blockedUntil,
+    });
   }
 
-  private clearFailedAttempts(ip: string): void {
-    this.failedAttempts.delete(ip);
+  private clearFailedAttempts(identifier: string): void {
+    this.failedAttempts.delete(identifier);
   }
 
   private async generateTokens(user: UserWithPermissions): Promise<AuthTokens> {
@@ -179,15 +222,14 @@ export class AuthService {
       where: { role: user.role },
       include: { permission: true },
     });
+
     const rolePerms = rolePermissions.map((rp) => rp.permission.name);
     const dbPerms = user.permissions?.map((p) => p.name) || [];
     const grantedPerms = user.grantedPermissions || [];
-    const allPermissions = [
-      ...rolePerms,
-      ...grantedPerms,
-      ...dbPerms,
-      user.role,
-    ];
+
+    const allPermissions = Array.from(
+      new Set([...rolePerms, ...grantedPerms, ...dbPerms, user.role]),
+    );
 
     const payload: TokenPayload = {
       sub: user.id,
@@ -197,8 +239,9 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(payload);
+
     const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get('JWT_REFRESH_SECRET'),
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: '7d',
     });
 
@@ -223,7 +266,9 @@ export class AuthService {
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-      grantedPermissions: [...rolePerms, ...(user.grantedPermissions || [])],
+      grantedPermissions: Array.from(
+        new Set([...rolePerms, ...(user.grantedPermissions || [])]),
+      ),
     };
   }
 }

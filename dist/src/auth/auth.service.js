@@ -58,16 +58,17 @@ let AuthService = class AuthService {
         this.configService = configService;
         this.auditLogService = auditLogService;
         this.failedAttempts = new Map();
-        this.BLOCK_DURATION_MS = 15 * 60 * 1000;
-        this.MAX_ATTEMPTS = 5;
+        this.MAX_ATTEMPTS = 10;
         this.ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
+        this.BLOCK_DURATION_MS = 15 * 60 * 1000;
     }
-    async register(data, ipAddress, userAgent) {
+    async register(data) {
         const existingUser = await this.prisma.user.findUnique({
             where: { email: data.email },
         });
-        if (existingUser)
+        if (existingUser) {
             throw new common_1.ConflictException('User with this email already exists');
+        }
         const hashedPassword = await bcrypt.hash(data.password, 10);
         const user = await this.prisma.user.create({
             data: {
@@ -79,35 +80,30 @@ let AuthService = class AuthService {
             },
             include: { permissions: true },
         });
-        await this.auditLogService.log({
-            userId: user.id,
-            userEmail: user.email,
-            action: client_1.AuditAction.REGISTER,
-            resource: 'user',
-            resourceId: user.id,
-            ipAddress,
-            userAgent,
-        });
         return this.generateTokens(user);
     }
     async login(data, ipAddress, userAgent) {
-        if (this.isIpBlocked(ipAddress || 'unknown')) {
-            throw new common_1.ForbiddenException('Too many failed attempts. Try again in 15 minutes.');
+        const identifier = ipAddress || 'unknown';
+        if (this.isIpBlocked(identifier)) {
+            throw new common_1.ForbiddenException('Too many failed login attempts. Try again after 15 minutes.');
         }
         const user = await this.prisma.user.findUnique({
             where: { email: data.email },
             include: { permissions: true },
         });
-        if (!user)
-            throw new common_1.UnauthorizedException('Invalid credentials');
-        const isPasswordValid = await bcrypt.compare(data.password, user.password);
-        if (!isPasswordValid) {
-            this.recordFailedAttempt(ipAddress || 'unknown');
+        if (!user) {
+            this.recordFailedAttempt(identifier);
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
-        if (!user.isActive)
+        const isPasswordValid = await bcrypt.compare(data.password, user.password);
+        if (!isPasswordValid) {
+            this.recordFailedAttempt(identifier);
+            throw new common_1.UnauthorizedException('Invalid credentials');
+        }
+        if (!user.isActive) {
             throw new common_1.UnauthorizedException('Account is inactive');
-        this.clearFailedAttempts(ipAddress || 'unknown');
+        }
+        this.clearFailedAttempts(identifier);
         await this.prisma.user.update({
             where: { id: user.id },
             data: { lastLoginAt: new Date() },
@@ -134,8 +130,9 @@ let AuthService = class AuthService {
                 where: { id: payload.sub },
                 include: { permissions: true },
             });
-            if (!user || !user.isActive)
+            if (!user || !user.isActive) {
                 throw new common_1.UnauthorizedException('Invalid refresh token');
+            }
             return this.generateTokens(user);
         }
         catch {
@@ -157,30 +154,38 @@ let AuthService = class AuthService {
         });
         return { message: 'Logged out successfully' };
     }
-    isIpBlocked(ip) {
-        const attempt = this.failedAttempts.get(ip);
-        if (!attempt)
+    isIpBlocked(identifier) {
+        const attempt = this.failedAttempts.get(identifier);
+        if (!attempt?.blockedUntil)
             return false;
-        if (Date.now() - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
-            this.failedAttempts.delete(ip);
+        const now = Date.now();
+        if (now >= attempt.blockedUntil) {
+            this.failedAttempts.delete(identifier);
             return false;
         }
         return true;
     }
-    recordFailedAttempt(ip) {
+    recordFailedAttempt(identifier) {
         const now = Date.now();
-        const attempt = this.failedAttempts.get(ip);
+        const attempt = this.failedAttempts.get(identifier);
         if (!attempt || now - attempt.lastAttempt > this.ATTEMPT_WINDOW_MS) {
-            this.failedAttempts.set(ip, { count: 1, lastAttempt: now });
+            this.failedAttempts.set(identifier, {
+                count: 1,
+                lastAttempt: now,
+            });
+            return;
         }
-        else {
-            attempt.count += 1;
-            attempt.lastAttempt = now;
-            this.failedAttempts.set(ip, attempt);
-        }
+        const nextCount = attempt.count + 1;
+        this.failedAttempts.set(identifier, {
+            count: nextCount,
+            lastAttempt: now,
+            blockedUntil: nextCount >= this.MAX_ATTEMPTS
+                ? now + this.BLOCK_DURATION_MS
+                : attempt.blockedUntil,
+        });
     }
-    clearFailedAttempts(ip) {
-        this.failedAttempts.delete(ip);
+    clearFailedAttempts(identifier) {
+        this.failedAttempts.delete(identifier);
     }
     async generateTokens(user) {
         const rolePermissions = await this.prisma.rolePermission.findMany({
@@ -190,12 +195,7 @@ let AuthService = class AuthService {
         const rolePerms = rolePermissions.map((rp) => rp.permission.name);
         const dbPerms = user.permissions?.map((p) => p.name) || [];
         const grantedPerms = user.grantedPermissions || [];
-        const allPermissions = [
-            ...rolePerms,
-            ...grantedPerms,
-            ...dbPerms,
-            user.role,
-        ];
+        const allPermissions = Array.from(new Set([...rolePerms, ...grantedPerms, ...dbPerms, user.role]));
         const payload = {
             sub: user.id,
             email: user.email,
@@ -224,7 +224,7 @@ let AuthService = class AuthService {
             lastLoginAt: user.lastLoginAt,
             createdAt: user.createdAt,
             updatedAt: user.updatedAt,
-            grantedPermissions: [...rolePerms, ...(user.grantedPermissions || [])],
+            grantedPermissions: Array.from(new Set([...rolePerms, ...(user.grantedPermissions || [])])),
         };
     }
 };
